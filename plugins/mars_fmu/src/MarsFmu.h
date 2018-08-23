@@ -1,0 +1,109 @@
+/*
+ *  Copyright 2013, DFKI GmbH Robotics Innovation Center
+ *
+ *  This file is part of the MARS simulation framework.
+ *
+ *  MARS is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Lesser General Public License
+ *  as published by the Free Software Foundation, either version 3
+ *  of the License, or (at your option) any later version.
+ *
+ *  MARS is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Lesser General Public License for more details.
+ *
+ *   You should have received a copy of the GNU Lesser General Public License
+ *   along with MARS.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+/**
+ * \file MarsFmu.h
+ * \author Julius (julius.martensen@dfki.de)
+ * \brief A
+ *
+ * Version 0.1
+ */
+
+#ifndef MARS_PLUGINS_MARS_FMU_H
+#define MARS_PLUGINS_MARS_FMU_H
+
+#ifdef _PRINT_HEADER_
+  #warning "MarsFmu.h"
+#endif
+
+// set define if you want to extend the gui
+//#define PLUGIN_WITH_MARS_GUI
+#include <mars/interfaces/sim/MarsPluginTemplate.h>
+#include <mars/interfaces/MARSDefs.h>
+#include <mars/data_broker/ReceiverInterface.h>
+#include <mars/cfg_manager/CFGManagerInterface.h>
+
+#include <string>
+
+#include "fmilib.h"
+
+namespace mars {
+
+  namespace plugins {
+    namespace mars_fmu {
+
+      // inherit from MarsPluginTemplateGUI for extending the gui
+      class MarsFmu: public mars::interfaces::MarsPluginTemplate,
+        public mars::data_broker::ReceiverInterface,
+        // for gui
+        // public mars::main_gui::MenuInterface,
+        public mars::cfg_manager::CFGClient {
+
+      public:
+        MarsFmu(lib_manager::LibManager *theManager);
+        ~MarsFmu();
+
+        // LibInterface methods
+        int getLibVersion() const
+        { return 1; }
+        const std::string getLibName() const
+        { return std::string("mars_fmu"); }
+        CREATE_MODULE_INFO();
+
+        // MarsPlugin methods
+        void init();
+        void reset();
+        void update(mars::interfaces::sReal time_ms);
+
+        // DataBrokerReceiver methods
+        virtual void receiveData(const data_broker::DataInfo &info,
+                                 const data_broker::DataPackage &package,
+                                 int callbackParam);
+        // CFGClient methods
+        virtual void cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property);
+
+        // MenuInterface methods
+        //void menuAction(int action, bool checked = false);
+
+        // MarsFmu methods
+
+      private:
+        cfg_manager::cfgPropertyStruct example;
+        // File system
+        std::string fmu_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/BouncingBall2.fmu";
+        std::string tmp_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp";
+
+        // Callbacks
+        jm_callbacks callbacks;
+
+        // FMI
+        fmi_import_context_t* context;
+        fmi_version_enu_t version;
+        jm_status_enu_t status;
+
+        fmi2_import_t* fmu;
+
+      }; // end of class definition MarsFmu
+
+    } // end of namespace mars_fmu
+  } // end of namespace plugins
+} // end of namespace mars
+
+#endif // MARS_PLUGINS_MARS_FMU_H
