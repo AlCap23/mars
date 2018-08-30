@@ -64,21 +64,21 @@ namespace mars {
         data_broker::DataPackage dbPackage;
 
         // Get the mars nodes
-        int i = 0;
+        //int i = 0;
 
-        if(!input_nodes[0].empty()){
-          for(i = 0; i < sizeof(input_nodes)/sizeof(input_nodes[0]); i++){
-            mars_input_ids[i] = control->motors->getID(input_nodes[i]);
-            printf("Found Motor %s : %d \n",input_nodes[i].c_str(), mars_input_ids[i] );
-          }
-        }
+        //if(!input_nodes[0].empty()){
+        //  for(i = 0; i < sizeof(input_nodes)/sizeof(input_nodes[0]); i++){
+        //    mars_input_ids[i] = control->motors->getID(input_nodes[i]);
+        //    printf("Found Motor %s : %d \n",input_nodes[i].c_str(), mars_input_ids[i] );
+        //  }
+        //}
 
-        if(!output_nodes[0].empty()){
-          for(i = 0; i < sizeof(output_nodes)/sizeof(output_nodes[0]); i++){
-            mars_output_ids[i] = control->sensors->getSensorID(output_nodes[i]);
-            printf("Found Sensor %s : %d \n",output_nodes[i].c_str(), mars_output_ids[i] );
-          }
-        }
+        //if(!output_nodes[0].empty()){
+        //  for(i = 0; i < sizeof(output_nodes)/sizeof(output_nodes[0]); i++){
+        //    mars_output_ids[i] = control->sensors->getSensorID(output_nodes[i]);
+        //    printf("Found Sensor %s : %d \n",output_nodes[i].c_str(), mars_output_ids[i] );
+        //  }
+        //}
 
 
         // Setup the callbacks
@@ -105,42 +105,58 @@ namespace mars {
 
 
         // Get the value Reference for in and outputs
-        if(!fmu_inputs[0].empty()){
-          for(i = 0; i < sizeof(fmu_inputs)/sizeof(fmu_inputs[0]); i++){
-            // Find the value reference
-            fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, fmu_inputs[i].c_str() );
-            fmu_Input_Ref[i] = fmi2_import_get_variable_vr(vr_pointer);
-            // Print for debug
-            printf("Inputs : %d = %s , VR : %d \n" , i, fmu_inputs[i].c_str(), fmu_Input_Ref[i] );
-            // Add the data broker packages
-            dbPackage.add("Inputs/"+fmu_inputs[i], 0.0);
-            // Create the ID mapping
+        //if(!fmu_inputs[0].empty()){
+        //  for(i = 0; i < sizeof(fmu_inputs)/sizeof(fmu_inputs[0]); i++){
+        //    // Find the value reference
+        //    fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, fmu_inputs[i].c_str() );
+        //    fmu_Input_Ref[i] = fmi2_import_get_variable_vr(vr_pointer);
+        //    // Print for debug
+        //    printf("Inputs : %d = %s , VR : %d \n" , i, fmu_inputs[i].c_str(), fmu_Input_Ref[i] );
+        //    // Add the data broker packages
+        //    dbPackage.add("Inputs/"+fmu_inputs[i], 0.0);
+        //    // Create the ID mapping
 
-          }
-        }
+        //  }
+        //}
 
         // Get the MARS -> FMU map
         for(auto mapping : mars_fmu_map){
-          // Find the mars sensors
+          // Find the fmu variable
           fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, mapping.second.c_str() );
-          mars_fmu_ID[control->motors->getID(mapping.first)] = fmi2_import_get_variable_vr(vr_pointer);
+          // Map the variable onto the motor
+          mars_fmu_ID[control->sensors->getSensorID(mapping.first)] = fmi2_import_get_variable_vr(vr_pointer);
+          // Add the data broker packages
+          dbPackage.add("Inputs/"+mapping.second, 0.0);
+        }
+
+        for(auto mapping : fmu_mars_map){
+          // Find the fmu variable
+          fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, mapping.first.c_str() );
+          fmu_mars_ID[fmi2_import_get_variable_vr(vr_pointer)] = control->motors->getID(mapping.second);
+          // Add the data broker packages
+          dbPackage.add("Outputs/"+mapping.first, 0.0);
         }
 
         for(auto mapping : mars_fmu_ID){
           printf("%d : %d \n", mapping.first, mapping.second );
         }
 
-        if(!fmu_outputs[0].empty()){
-          for(i = 0; i < sizeof(fmu_outputs)/sizeof(fmu_outputs[0]); i++){
-            // Find the value reference
-            fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, fmu_outputs[i].c_str() );
-            fmu_Output_Ref[i] = fmi2_import_get_variable_vr(vr_pointer);
-            // Print for debug
-            printf("Outputs : %d = %s, VR : %d \n", i, fmu_outputs[i].c_str(), fmu_Output_Ref[i] );
-            // Add the data broker packages
-            dbPackage.add("Outputs/"+fmu_outputs[i], 0.0);
-          }
+        for(auto mapping : fmu_mars_ID){
+          printf("%d : %d \n", mapping.first, mapping.second );
         }
+
+
+        //if(!fmu_outputs[0].empty()){
+        //  for(i = 0; i < sizeof(fmu_outputs)/sizeof(fmu_outputs[0]); i++){
+        //    // Find the value reference
+        //    fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, fmu_outputs[i].c_str() );
+        //    fmu_Output_Ref[i] = fmi2_import_get_variable_vr(vr_pointer);
+        //    // Print for debug
+        //    printf("Outputs : %d = %s, VR : %d \n", i, fmu_outputs[i].c_str(), fmu_Output_Ref[i] );
+        //    // Add the data broker packages
+        //    dbPackage.add("Outputs/"+fmu_outputs[i], 0.0);
+        //  }
+        //}
 
         if(!fmu) {
       		printf("Error parsing XML, exiting\n");
@@ -243,19 +259,25 @@ namespace mars {
 
       void MarsFmu::update(sReal time_ms) {
         // Get the input values
-        sReal *sensorData;
-        int numSensorValues = control->sensors->getSensorData(mars_output_ids[0], &sensorData);
-        fmu_input_values[1] = sensorData[0];
+        for(auto mapping : mars_fmu_ID){
+            fmi2_real_t *sensorData;
+            int numSensorValues = control->sensors->getSensorData(mapping.first, &sensorData);
+            fmu_status = fmi2_import_set_real(fmu, &mapping.second, 1, sensorData);
+            free(sensorData);
+        }
+
+        //int numSensorValues = control->sensors->getSensorData(mars_output_ids[0], &sensorData);
+        //fmu_input_values[1] = sensorData[0];
         //printf("%d \n", numSensorValues);
-        free(sensorData);
+        //free(sensorData);
         // Conversion needed because mars calculates in ms
         while(current_time*1000 < time_ms){
-          fmu_status = fmi2_import_set_real(fmu, fmu_Input_Ref, 2, fmu_input_values);
+          //fmu_status = fmi2_import_set_real(fmu, fmu_Input_Ref, 2, fmu_input_values);
           // Do a step
           fmu_status = fmi2_import_do_step(fmu, current_time, time_step, fmi2_true);
           // Get results
           //fmi2_real_t values[2];
-          fmu_status = fmi2_import_get_real(fmu, fmu_Output_Ref, 1, fmu_output_values);
+          //fmu_status = fmi2_import_get_real(fmu, fmu_Output_Ref, 1, fmu_output_values);
           // printf("y[0] = %2.4f \n y[1] = %2.4f", fmu_results[0], fmu_results[1]);
           // Check if fmu feels good
           if(fmu_status != fmi2_status_ok){
@@ -264,32 +286,40 @@ namespace mars {
           // Raise time
           current_time += time_step;
         }
+
+        // Set the output values
+        for(auto mapping : fmu_mars_ID){
+          fmi2_real_t fmu_output = 0.0;
+          fmu_status = fmi2_import_get_real(fmu, &mapping.first, 1, &fmu_output);
+          control->motors->setMotorValue(mapping.second, fmu_output);
+        }
         // Set the motor value
-        control->motors->setMotorValue(mars_input_ids[0], fmu_output_values[0]);
+        //control->motors->setMotorValue(mars_input_ids[0], fmu_output_values[0]);
 
         // Reset internal time
         current_time = 0.0;
         // control->motors->setMotorValue(id, value);
+
       }
 
       void MarsFmu::produceData(const data_broker::DataInfo &info,
                                          data_broker::DataPackage *package,
                                          int callbackParam) {
-          int i = 0;
-          if(!fmu_inputs[0].empty()){
-            for(i = 0; i < sizeof(fmu_inputs)/sizeof(fmu_inputs[0]); i++){
-              // Send to the data broker
-              package->set(i, fmu_input_values[i]);
-            }
-          }
+          //int i = 0;
+          //if(!fmu_inputs[0].empty()){
+          //  for(i = 0; i < sizeof(fmu_inputs)/sizeof(fmu_inputs[0]); i++){
+          //    // Send to the data broker
+          //    package->set(i, fmu_input_values[i]);
+          //  }
+          //}
 
-          int j = i;
-            if(!fmu_outputs[0].empty()){
-             for(i = 0; i < sizeof(fmu_outputs)/sizeof(fmu_outputs[0]); i++){
-               // Send to the data broker
-               package->set(i+j, fmu_output_values[i]);
-             }
-            }
+          //int j = i;
+          //  if(!fmu_outputs[0].empty()){
+          //   for(i = 0; i < sizeof(fmu_outputs)/sizeof(fmu_outputs[0]); i++){
+          //     // Send to the data broker
+          //     package->set(i+j, fmu_output_values[i]);
+          //   }
+          //  }
 
                                     }
 

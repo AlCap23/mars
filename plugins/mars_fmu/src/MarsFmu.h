@@ -111,10 +111,11 @@ namespace mars {
         // Map inputs and outputs from fmu to mars and vice versa
         std::map<std::string, std::string> mars_fmu_map = { {"joint_torque", "external_torque"}};
         std::map<std::string, std::string> fmu_mars_map = { {"output_speed", "motor_a"} };
+        std::string fmu_observed[1] = {'output_speed'};
 
         // Make some ID maps
-        std::map<unsigned long, unsigned long> mars_fmu_ID;
-        std::map<unsigned long, unsigned long> fmu_mars_ID;
+        std::map<unsigned long, fmi2_value_reference_t> mars_fmu_ID;
+        std::map<fmi2_value_reference_t, unsigned long> fmu_mars_ID;
 
         // File system
         std::string typeName;
@@ -146,6 +147,7 @@ namespace mars {
         fmi2_value_reference_t fmu_Output_Ref[1] = {0};
 
         // Store inputs and outputs
+
         fmi2_real_t fmu_input_values[2] = {22.0, 10.0};
         fmi2_real_t fmu_output_values[1] = {0.0};
 
