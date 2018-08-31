@@ -86,7 +86,7 @@ namespace mars {
         virtual void produceData(const data_broker::DataInfo &info,
                                  data_broker::DataPackage *package,
                                  int callbackParam);
-        // CFGClient methods
+        //// CFGClient methods
         virtual void cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property);
 
         // MenuInterface methods
@@ -100,18 +100,19 @@ namespace mars {
       private:
         cfg_manager::cfgPropertyStruct example;
 
+        //TODO Delte this!
         // Inputs and Outputs for the FMU
-        std::string fmu_inputs[2] = {"input_voltage", "external_torque"};
-        std::string fmu_outputs[1] = {"output_speed"};
+        //std::string fmu_inputs[2] = {"input_voltage", "external_torque"};
+        //std::string fmu_outputs[1] = {"output_speed"};
 
         // Mars Inputs and outputs
-        std::string input_nodes[1] = {"motor_a"};
-        std::string output_nodes[1] = {"joint_torque"};
+        //std::string input_nodes[1] = {"motor_a"};
+        //std::string output_nodes[1] = {"joint_torque"};
 
         // Map inputs and outputs from fmu to mars and vice versa
-        std::map<std::string, std::string> mars_fmu_map = { {"joint_torque", "external_torque"}};
-        std::map<std::string, std::string> fmu_mars_map = { {"output_speed", "motor_a"} };
-        std::string fmu_observed[1] = {'output_speed'};
+        std::map<std::string, std::string> mars_fmu_map; // = { {"joint_torque", "external_torque"}};
+        std::map<std::string, std::string> fmu_mars_map;// = { {"output_speed", "motor_a"} };
+        std::string fmu_observed[1] = {"output_speed"};
 
         // Make some ID maps
         std::map<unsigned long, fmi2_value_reference_t> mars_fmu_ID;
@@ -119,8 +120,8 @@ namespace mars {
 
         // File system
         std::string typeName;
-        std::string fmu_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/PT2.fmu";
-        std::string tmp_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp";
+        std::string fmu_path; //= "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/PT2.fmu";
+        std::string tmp_path; // = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp";
 
         // Callbacks
         jm_callbacks callbacks;
@@ -133,31 +134,32 @@ namespace mars {
         fmi2_callback_functions_t callBackFunctions;
 
         // FMI - Global variables used for simulation
-        fmi2_string_t fmu_instanceName = "Test Model";
+        fmi2_string_t fmu_instanceName; // = "Test Model";
         fmi2_string_t fmu_GUID;
-        fmi2_string_t fmu_location = "";
-        fmi2_boolean_t fmu_visible = fmi2_false;
-        fmi2_real_t fmu_relativeTolerance = 1e-2;
+        //fmi2_string_t fmu_location = "";
+        //fmi2_boolean_t fmu_visible = fmi2_false;
+        fmi2_real_t fmu_relativeTolerance; // = 1e-2;
 
         fmi2_status_t fmu_status;
         jm_status_enu_t fmu_status_jm;
 
         // Need to work on that, here are the outputs
-        fmi2_value_reference_t fmu_Input_Ref[2] = {0, 0};
-        fmi2_value_reference_t fmu_Output_Ref[1] = {0};
+        //fmi2_value_reference_t fmu_Input_Ref[2] = {0, 0};
+        //fmi2_value_reference_t fmu_Output_Ref[1] = {0};
 
         // Store inputs and outputs
+        fmi2_real_t fmu_output = 0.0;
+        fmi2_real_t *sensorData;
+        //fmi2_real_t fmu_input_values[2] = {22.0, 10.0};
+        //fmi2_real_t fmu_output_values[1] = {0.0};
 
-        fmi2_real_t fmu_input_values[2] = {22.0, 10.0};
-        fmi2_real_t fmu_output_values[1] = {0.0};
-
-        fmi2_real_t current_time = 0.0;
-        fmi2_real_t time_step = 1e-3;
-        fmi2_boolean_t stop_time_defined = fmi2_false;
+        fmi2_real_t current_time; // = 0.0;
+        fmi2_real_t time_step; // = 1e-3;
+        fmi2_boolean_t stop_time_defined; // = fmi2_false;
 
         // Mars IDs
-        unsigned long mars_input_ids[1] = {0};
-        unsigned long mars_output_ids[1] = {0};
+        //unsigned long mars_input_ids[1] = {0};
+        //unsigned long mars_output_ids[1] = {0};
 
 
       }; // end of class definition MarsFmu

@@ -1,54 +1,1046 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <fmiModelDescription
   fmiVersion="2.0"
-  modelName="BouncingBall"
-  generationTool="None"
-  description="A bouncing ball model"
-  guid="123"
-  numberOfEventIndicators="1">
-  <CoSimulation 
-	modelIdentifier="BouncingBall2" 
-	canHandleVariableCommunicationStepSize="true"
-	/>
-<ModelVariables>
-  <ScalarVariable name="HIGHT" valueReference="0" initial="exact" causality="output" description="Hight of the ball">
-    <Real start="1.0" />
+  modelName="DC_Motor_Model.Assemblies.PT2_Actuation"
+  guid="{c5630a47-139f-4fac-b252-258006dfccb1}"
+  description=""
+  generationTool="OpenModelica Compiler OpenModelica 1.13.0~dev-1071-g6c456fc"
+  generationDateAndTime="2018-06-15T13:07:46Z"
+  variableNamingConvention="structured"
+  numberOfEventIndicators="0">
+  <ModelExchange
+    modelIdentifier="DC_Motor_Model_Assemblies_PT2_Actuation">
+  </ModelExchange>
+  <CoSimulation
+    modelIdentifier="DC_Motor_Model_Assemblies_PT2_Actuation"
+    needsExecutionTool="false"
+    canHandleVariableCommunicationStepSize="true"
+    canInterpolateInputs="false"
+    maxOutputDerivativeOrder="1"
+    canRunAsynchronuously = "false"
+    canBeInstantiatedOnlyOncePerProcess="false"
+    canNotUseMemoryManagementFunctions="false"
+    canGetAndSetFMUstate="false"
+    canSerializeFMUstate="false"
+     />
+  <TypeDefinitions>
+    <SimpleType name="StateSelect">
+      <Enumeration>
+        <Item name="never" value="1"/>
+        <Item name="avoid" value="2"/>
+        <Item name="default" value="3"/>
+        <Item name="prefer" value="4"/>
+        <Item name="always" value="5"/>
+      </Enumeration>
+    </SimpleType>
+    <SimpleType name="Modelica.Blocks.Types.Init">
+      <Enumeration>
+        <Item name="NoInit" value="1"/>
+        <Item name="SteadyState" value="2"/>
+        <Item name="InitialState" value="3"/>
+        <Item name="InitialOutput" value="4"/>
+      </Enumeration>
+    </SimpleType>
+  </TypeDefinitions>
+  <LogCategories>
+    <Category name="logEvents" />
+    <Category name="logSingularLinearSystems" />
+    <Category name="logNonlinearSystems" />
+    <Category name="logDynamicStateSelection" />
+    <Category name="logStatusWarning" />
+    <Category name="logStatusDiscard" />
+    <Category name="logStatusError" />
+    <Category name="logStatusFatal" />
+    <Category name="logStatusPending" />
+    <Category name="logAll" />
+    <Category name="logFmi2Call" />
+  </LogCategories>
+  <DefaultExperiment startTime="0.0" stopTime="1.0" tolerance="1e-10"/>
+  <ModelVariables>
+  <!-- Index of variable = "1" -->
+  <ScalarVariable
+    name="gear.speed1.phi"
+    valueReference="0"
+    description="Rotation angle of flange with respect to support"
+    variability="continuous"
+    causality="local"
+    initial="exact">
+    <Real start="0.0" unit="rad"/>
   </ScalarVariable>
-  <ScalarVariable name="HIGHT_SPEED" valueReference="1" initial="exact" description="Speed of the ball">
-     <Real start="4.0" />
-	 </ScalarVariable> 
-  <ScalarVariable name="HIGHT_SPEED alias" valueReference="1" description="Speed of the ball">
-     <Real />
-	 </ScalarVariable> 
-  <ScalarVariable name="HIGHT_ACC" valueReference="4" description="Speed of the ball">
-     <Real />	 
-  </ScalarVariable>   
-  <ScalarVariable name="A variable" valueReference="100" initial="exact" description="Speed of the ball">
-     <Real start="4.0" />
+  <!-- Index of variable = "2" -->
+  <ScalarVariable
+    name="gear.speed1.w"
+    valueReference="1"
+    description="Angular velocity of flange with respect to support"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad/s"/>
   </ScalarVariable>
-  <ScalarVariable name="GRAVITY" valueReference="2" description="Gravity constant" initial="exact">
-     <Real start="-9.81"/>
+  <!-- Index of variable = "3" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.x_scaled[1]"
+    valueReference="2"
+    description="Scaled vector x"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real/>
   </ScalarVariable>
-  <ScalarVariable name="BOUNCE_COF" valueReference="3" initial="exact" description="Bouncing coefficient">
-     <Real start="0.5" />
+  <!-- Index of variable = "4" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.x_scaled[2]"
+    valueReference="3"
+    description="Scaled vector x"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real/>
   </ScalarVariable>
-  <ScalarVariable name="LOGGER_TEST" valueReference="0" description="The logger will print the value of this variable when it is set.">
-     <String/>
-  </ScalarVariable>  
-    <ScalarVariable name="LOGGER_TEST_INTEGER" valueReference="0" description="This is only used to test logger replace function #i0#">
-     <Integer/>
-  </ScalarVariable>  
-    <ScalarVariable name="LOGGER_TEST_BOOLEAN" valueReference="0" description="This is only used to test logger replace function #b0#">
-     <Boolean/>
+  <!-- Index of variable = "5" -->
+  <ScalarVariable
+    name="der(gear.speed1.phi)"
+    valueReference="4"
+    description="der(Rotation angle of flange with respect to support)"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real derivative="1" unit="Hz"/>
   </ScalarVariable>
-  <ScalarVariable name="LOGGER_TEST_DERIVATIVE" valueReference="10" description="This is to test that the derivative attribute may appear on any Real variables.">
-     <Real/>
+  <!-- Index of variable = "6" -->
+  <ScalarVariable
+    name="der(gear.speed1.w)"
+    valueReference="5"
+    description="der(Angular velocity of flange with respect to support)"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real derivative="2" unit="s-2"/>
   </ScalarVariable>
-  <ScalarVariable name="LOGGER_TEST_DERIVATIVE_DER" valueReference="11" variability="fixed" description="This is to test that the derivative attribute may appear on any Real variables.">
-     <Real derivative="12"/>
+  <!-- Index of variable = "7" -->
+  <ScalarVariable
+    name="der(motor_model.transferFunction1.x_scaled[1])"
+    valueReference="6"
+    description="der(Scaled vector x)"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real derivative="3"/>
   </ScalarVariable>
-</ModelVariables>
-<ModelStructure>
-</ModelStructure>
+  <!-- Index of variable = "8" -->
+  <ScalarVariable
+    name="der(motor_model.transferFunction1.x_scaled[2])"
+    valueReference="7"
+    description="der(Scaled vector x)"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real derivative="4"/>
+  </ScalarVariable>
+  <!-- Index of variable = "9" -->
+  <ScalarVariable
+    name="der(gear.inertia1.phi)"
+    valueReference="8"
+    description="Absolute rotation angle of component"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "10" -->
+  <ScalarVariable
+    name="der(gear.inertia1.w)"
+    valueReference="9"
+    description="Absolute angular velocity of component (= der(phi))"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "11" -->
+  <ScalarVariable
+    name="add1.u2"
+    valueReference="10"
+    description="Connector of Real input signal 2"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "12" -->
+  <ScalarVariable
+    name="add1.y"
+    valueReference="11"
+    description="Connector of Real output signal"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "13" -->
+  <ScalarVariable
+    name="external_torque"
+    valueReference="12"
+    variability="continuous"
+    causality="input"
+    >
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "14" -->
+  <ScalarVariable
+    name="gear.idealGear1.flange_a.tau"
+    valueReference="13"
+    description="Cut torque in the flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="N.m"/>
+  </ScalarVariable>
+  <!-- Index of variable = "15" -->
+  <ScalarVariable
+    name="gear.idealGear1.flange_b.tau"
+    valueReference="14"
+    description="Cut torque in the flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="N.m"/>
+  </ScalarVariable>
+  <!-- Index of variable = "16" -->
+  <ScalarVariable
+    name="gear.idealGear1.phi_support"
+    valueReference="15"
+    description="Absolute angle of support flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "17" -->
+  <ScalarVariable
+    name="gear.inertia1.a"
+    valueReference="16"
+    description="Absolute angular acceleration of component (= der(w))"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad/s2"/>
+  </ScalarVariable>
+  <!-- Index of variable = "18" -->
+  <ScalarVariable
+    name="gear.inertia1.phi"
+    valueReference="17"
+    description="Absolute rotation angle of component"
+    variability="continuous"
+    causality="local"
+    initial="exact">
+    <Real start="0.0" unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "19" -->
+  <ScalarVariable
+    name="gear.inertia1.w"
+    valueReference="18"
+    description="Absolute angular velocity of component (= der(phi))"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad/s"/>
+  </ScalarVariable>
+  <!-- Index of variable = "20" -->
+  <ScalarVariable
+    name="gear.speed1.a"
+    valueReference="19"
+    description="If exact=false, angular acceleration of flange with respect to support else dummy"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad/s2"/>
+  </ScalarVariable>
+  <!-- Index of variable = "21" -->
+  <ScalarVariable
+    name="gear.speed1.phi_support"
+    valueReference="20"
+    description="Absolute angle of support flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "22" -->
+  <ScalarVariable
+    name="gear.speed1.w_ref"
+    valueReference="21"
+    description="Reference angular velocity of flange with respect to support as input signal"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad/s"/>
+  </ScalarVariable>
+  <!-- Index of variable = "23" -->
+  <ScalarVariable
+    name="gear.torque1.phi_support"
+    valueReference="22"
+    description="Absolute angle of support flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "24" -->
+  <ScalarVariable
+    name="input_voltage"
+    valueReference="23"
+    variability="continuous"
+    causality="input"
+    >
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "25" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.x[1]"
+    valueReference="24"
+    description="State of transfer function from controller canonical form"
+    variability="continuous"
+    causality="local"
+    initial="exact">
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "26" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.x[2]"
+    valueReference="25"
+    description="State of transfer function from controller canonical form"
+    variability="continuous"
+    causality="local"
+    initial="exact">
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "27" -->
+  <ScalarVariable
+    name="output_speed"
+    valueReference="26"
+    variability="continuous"
+    causality="output"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "28" -->
+  <ScalarVariable
+    name="J_Gear"
+    valueReference="27"
+    description="inertia of the gear"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="2.63e-05"/>
+  </ScalarVariable>
+  <!-- Index of variable = "29" -->
+  <ScalarVariable
+    name="J_Motor"
+    valueReference="28"
+    description="rotor inertia"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="2.1e-05"/>
+  </ScalarVariable>
+  <!-- Index of variable = "30" -->
+  <ScalarVariable
+    name="L"
+    valueReference="29"
+    description="terminal inductance"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.0008"/>
+  </ScalarVariable>
+  <!-- Index of variable = "31" -->
+  <ScalarVariable
+    name="R"
+    valueReference="30"
+    description="terminal resistance"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.47"/>
+  </ScalarVariable>
+  <!-- Index of variable = "32" -->
+  <ScalarVariable
+    name="add1.k1"
+    valueReference="31"
+    description="Gain of upper input"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="1.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "33" -->
+  <ScalarVariable
+    name="add1.k2"
+    valueReference="32"
+    description="Gain of lower input"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="-1.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "34" -->
+  <ScalarVariable
+    name="const.k"
+    valueReference="33"
+    description="Constant output value"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "35" -->
+  <ScalarVariable
+    name="f"
+    valueReference="34"
+    description="assumed friction coefficient"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.01"/>
+  </ScalarVariable>
+  <!-- Index of variable = "36" -->
+  <ScalarVariable
+    name="gain1.k"
+    valueReference="35"
+    description="Gain value multiplied with input signal"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real unit="1"/>
+  </ScalarVariable>
+  <!-- Index of variable = "37" -->
+  <ScalarVariable
+    name="gear.J"
+    valueReference="36"
+    description="inertia of the gear"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "38" -->
+  <ScalarVariable
+    name="gear.idealGear1.ratio"
+    valueReference="37"
+    description="Transmission ratio (flange_a.phi/flange_b.phi)"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "39" -->
+  <ScalarVariable
+    name="gear.inertia1.J"
+    valueReference="38"
+    description="Moment of inertia"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real min="0.0" unit="kg.m2"/>
+  </ScalarVariable>
+  <!-- Index of variable = "40" -->
+  <ScalarVariable
+    name="gear.speed1.f_crit"
+    valueReference="39"
+    description="if exact=false, critical frequency of filter to filter input signal"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="50.0" unit="Hz"/>
+  </ScalarVariable>
+  <!-- Index of variable = "41" -->
+  <ScalarVariable
+    name="gear.speed1.w_crit"
+    valueReference="40"
+    description="Critical frequency"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real unit="rad/s"/>
+  </ScalarVariable>
+  <!-- Index of variable = "42" -->
+  <ScalarVariable
+    name="gear.transmission"
+    valueReference="41"
+    description="transmission of the gear"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "43" -->
+  <ScalarVariable
+    name="kT"
+    valueReference="42"
+    description="torque constant"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.11"/>
+  </ScalarVariable>
+  <!-- Index of variable = "44" -->
+  <ScalarVariable
+    name="kV"
+    valueReference="43"
+    description="back emf constant"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "45" -->
+  <ScalarVariable
+    name="motor_model.J"
+    valueReference="44"
+    description="rotor inertia"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "46" -->
+  <ScalarVariable
+    name="motor_model.L"
+    valueReference="45"
+    description="terminal inductance"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "47" -->
+  <ScalarVariable
+    name="motor_model.R"
+    valueReference="46"
+    description="terminal resistance"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "48" -->
+  <ScalarVariable
+    name="motor_model.T1"
+    valueReference="47"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "49" -->
+  <ScalarVariable
+    name="motor_model.T2"
+    valueReference="48"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "50" -->
+  <ScalarVariable
+    name="motor_model.f"
+    valueReference="49"
+    description="assumed friction coefficient"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "51" -->
+  <ScalarVariable
+    name="motor_model.k"
+    valueReference="50"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "52" -->
+  <ScalarVariable
+    name="motor_model.kT"
+    valueReference="51"
+    description="torque constant"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "53" -->
+  <ScalarVariable
+    name="motor_model.kV"
+    valueReference="52"
+    description="back emf constant"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "54" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.a[1]"
+    valueReference="53"
+    description="Denominator coefficients of transfer function (e.g., 5*s+6 is specified as {5,6})"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "55" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.a[2]"
+    valueReference="54"
+    description="Denominator coefficients of transfer function (e.g., 5*s+6 is specified as {5,6})"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "56" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.a[3]"
+    valueReference="55"
+    description="Denominator coefficients of transfer function (e.g., 5*s+6 is specified as {5,6})"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="1.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "57" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.a_end"
+    valueReference="56"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "58" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.b[1]"
+    valueReference="57"
+    description="Numerator coefficients of transfer function (e.g., 2*s+3 is specified as {2,3})"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "59" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.bb[1]"
+    valueReference="58"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "60" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.bb[2]"
+    valueReference="59"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "61" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.bb[3]"
+    valueReference="60"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "62" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.d"
+    valueReference="61"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "63" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.x_start[1]"
+    valueReference="62"
+    description="Initial or guess values of states"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "64" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.x_start[2]"
+    valueReference="63"
+    description="Initial or guess values of states"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "65" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.y_start"
+    valueReference="64"
+    description="Initial value of output (derivatives of y are zero up to nx-1-th derivative)"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="0.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "66" -->
+  <ScalarVariable
+    name="transmission"
+    valueReference="65"
+    description="transmission of the gear"
+    variability="fixed"
+    causality="parameter"
+    initial="exact">
+    <Real start="100.0"/>
+  </ScalarVariable>
+  <!-- Index of variable = "67" -->
+  <ScalarVariable
+    name="add1.u1"
+    valueReference="23"
+    description="Connector of Real input signal 1"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "68" -->
+  <ScalarVariable
+    name="const.y"
+    valueReference="33"
+    description="Connector of Real output signal"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "69" -->
+  <ScalarVariable
+    name="gain1.u"
+    valueReference="12"
+    description="Input signal connector"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "70" -->
+  <ScalarVariable
+    name="gain1.y"
+    valueReference="10"
+    description="Output signal connector"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "71" -->
+  <ScalarVariable
+    name="gear.external_torque"
+    valueReference="33"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "72" -->
+  <ScalarVariable
+    name="gear.idealGear1.flange_a.phi"
+    valueReference="0"
+    description="Absolute rotation angle of flange"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "73" -->
+  <ScalarVariable
+    name="gear.idealGear1.flange_b.phi"
+    valueReference="17"
+    description="Absolute rotation angle of flange"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "74" -->
+  <ScalarVariable
+    name="gear.idealGear1.phi_a"
+    valueReference="0"
+    description="Angle between left shaft flange and support"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "75" -->
+  <ScalarVariable
+    name="gear.idealGear1.phi_b"
+    valueReference="17"
+    description="Angle between right shaft flange and support"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "76" -->
+  <ScalarVariable
+    name="gear.inertia1.flange_a.phi"
+    valueReference="17"
+    description="Absolute rotation angle of flange"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "77" -->
+  <ScalarVariable
+    name="gear.inertia1.flange_a.tau"
+    valueReference="76"
+    description="Cut torque in the flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="N.m"/>
+  </ScalarVariable>
+  <!-- Index of variable = "78" -->
+  <ScalarVariable
+    name="gear.inertia1.flange_b.phi"
+    valueReference="17"
+    description="Absolute rotation angle of flange"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "79" -->
+  <ScalarVariable
+    name="gear.inertia1.flange_b.tau"
+    valueReference="33"
+    description="Cut torque in the flange"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="N.m"/>
+  </ScalarVariable>
+  <!-- Index of variable = "80" -->
+  <ScalarVariable
+    name="gear.input_velocity"
+    valueReference="21"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "81" -->
+  <ScalarVariable
+    name="gear.speed1.flange.phi"
+    valueReference="0"
+    description="Absolute rotation angle of flange"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "82" -->
+  <ScalarVariable
+    name="gear.speed1.flange.tau"
+    valueReference="81"
+    description="Cut torque in the flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="N.m"/>
+  </ScalarVariable>
+  <!-- Index of variable = "83" -->
+  <ScalarVariable
+    name="gear.torque1.flange.phi"
+    valueReference="17"
+    description="Absolute rotation angle of flange"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="rad"/>
+  </ScalarVariable>
+  <!-- Index of variable = "84" -->
+  <ScalarVariable
+    name="gear.torque1.flange.tau"
+    valueReference="83"
+    description="Cut torque in the flange"
+    variability="continuous"
+    causality="local"
+    initial="calculated">
+    <Real unit="N.m"/>
+  </ScalarVariable>
+  <!-- Index of variable = "85" -->
+  <ScalarVariable
+    name="gear.torque1.tau"
+    valueReference="33"
+    description="Accelerating torque acting at flange (= -flange.tau)"
+    variability="continuous"
+    causality="local"
+    >
+    <Real unit="N.m"/>
+  </ScalarVariable>
+  <!-- Index of variable = "86" -->
+  <ScalarVariable
+    name="motor_model.input_voltage"
+    valueReference="11"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "87" -->
+  <ScalarVariable
+    name="motor_model.output_speed"
+    valueReference="21"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "88" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.u"
+    valueReference="11"
+    description="Connector of Real input signal"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "89" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.y"
+    valueReference="21"
+    description="Connector of Real output signal"
+    variability="continuous"
+    causality="local"
+    >
+    <Real/>
+  </ScalarVariable>
+  <!-- Index of variable = "90" -->
+  <ScalarVariable
+    name="gear.inertia1.stateSelect"
+    valueReference="0"
+    description="Priority to use phi and w as states"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Enumeration declaredType="StateSelect"/>
+  </ScalarVariable>
+  <!-- Index of variable = "91" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.initType"
+    valueReference="1"
+    description="Type of initialization (1: no init, 2: steady state, 3: initial state, 4: initial output)"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Enumeration declaredType="Modelica.Blocks.Types.Init"/>
+  </ScalarVariable>
+  <!-- Index of variable = "92" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.na"
+    valueReference="2"
+    description="Size of Denominator of transfer function."
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Integer/>
+  </ScalarVariable>
+  <!-- Index of variable = "93" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.nb"
+    valueReference="3"
+    description="Size of Numerator of transfer function."
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Integer/>
+  </ScalarVariable>
+  <!-- Index of variable = "94" -->
+  <ScalarVariable
+    name="motor_model.transferFunction1.nx"
+    valueReference="4"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Integer/>
+  </ScalarVariable>
+  <!-- Index of variable = "95" -->
+  <ScalarVariable
+    name="gear.idealGear1.useSupport"
+    valueReference="0"
+    description="= true, if support flange enabled, otherwise implicitly grounded"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Boolean/>
+  </ScalarVariable>
+  <!-- Index of variable = "96" -->
+  <ScalarVariable
+    name="gear.mechanical_coupling"
+    valueReference="1"
+    description="coupling procedure"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Boolean/>
+  </ScalarVariable>
+  <!-- Index of variable = "97" -->
+  <ScalarVariable
+    name="gear.speed1.exact"
+    valueReference="2"
+    description="true/false exact treatment/filtering the input signal"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Boolean/>
+  </ScalarVariable>
+  <!-- Index of variable = "98" -->
+  <ScalarVariable
+    name="gear.speed1.useSupport"
+    valueReference="3"
+    description="= true, if support flange enabled, otherwise implicitly grounded"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Boolean/>
+  </ScalarVariable>
+  <!-- Index of variable = "99" -->
+  <ScalarVariable
+    name="gear.torque1.useSupport"
+    valueReference="4"
+    description="= true, if support flange enabled, otherwise implicitly grounded"
+    variability="fixed"
+    causality="calculatedParameter"
+    initial="calculated">
+    <Boolean/>
+  </ScalarVariable>
+  </ModelVariables>
+  <ModelStructure>
+    <Outputs>
+      <Unknown index="27" dependencies="2" dependenciesKind="dependent" />
+    </Outputs>
+    <Derivatives>
+      <Unknown index="5" dependencies="2" dependenciesKind="dependent" />
+      <Unknown index="6" dependencies="2 3 4 13 24" dependenciesKind="dependent dependent dependent dependent dependent" />
+      <Unknown index="7" dependencies="3 4 13 24" dependenciesKind="dependent dependent dependent dependent" />
+      <Unknown index="8" dependencies="3" dependenciesKind="dependent" />
+    </Derivatives>
+  </ModelStructure>
 </fmiModelDescription>
-

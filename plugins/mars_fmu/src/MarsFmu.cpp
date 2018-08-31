@@ -58,27 +58,20 @@ namespace mars {
       }
 
       void MarsFmu::init() {
+        fmu_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/PT2.fmu";
+        tmp_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp";
 
+        // Clear tmp folder
+        system("exec rm -r /media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp/* ");
+
+        fmu_instanceName = "Test Model";
+        fmu_relativeTolerance = 0.001;
+        current_time = 0.0;
+        time_step = 0.001;
+        stop_time_defined = fmi2_false;
         // Data broker configuration
         typeName = "FMU";
         data_broker::DataPackage dbPackage;
-
-        // Get the mars nodes
-        //int i = 0;
-
-        //if(!input_nodes[0].empty()){
-        //  for(i = 0; i < sizeof(input_nodes)/sizeof(input_nodes[0]); i++){
-        //    mars_input_ids[i] = control->motors->getID(input_nodes[i]);
-        //    printf("Found Motor %s : %d \n",input_nodes[i].c_str(), mars_input_ids[i] );
-        //  }
-        //}
-
-        //if(!output_nodes[0].empty()){
-        //  for(i = 0; i < sizeof(output_nodes)/sizeof(output_nodes[0]); i++){
-        //    mars_output_ids[i] = control->sensors->getSensorID(output_nodes[i]);
-        //    printf("Found Sensor %s : %d \n",output_nodes[i].c_str(), mars_output_ids[i] );
-        //  }
-        //}
 
 
         // Setup the callbacks
@@ -104,20 +97,6 @@ namespace mars {
         fmu = fmi2_import_parse_xml(context, tmp_path.c_str(), 0);
 
 
-        // Get the value Reference for in and outputs
-        //if(!fmu_inputs[0].empty()){
-        //  for(i = 0; i < sizeof(fmu_inputs)/sizeof(fmu_inputs[0]); i++){
-        //    // Find the value reference
-        //    fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, fmu_inputs[i].c_str() );
-        //    fmu_Input_Ref[i] = fmi2_import_get_variable_vr(vr_pointer);
-        //    // Print for debug
-        //    printf("Inputs : %d = %s , VR : %d \n" , i, fmu_inputs[i].c_str(), fmu_Input_Ref[i] );
-        //    // Add the data broker packages
-        //    dbPackage.add("Inputs/"+fmu_inputs[i], 0.0);
-        //    // Create the ID mapping
-
-        //  }
-        //}
 
         // Get the MARS -> FMU map
         for(auto mapping : mars_fmu_map){
@@ -145,19 +124,6 @@ namespace mars {
           printf("%d : %d \n", mapping.first, mapping.second );
         }
 
-
-        //if(!fmu_outputs[0].empty()){
-        //  for(i = 0; i < sizeof(fmu_outputs)/sizeof(fmu_outputs[0]); i++){
-        //    // Find the value reference
-        //    fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, fmu_outputs[i].c_str() );
-        //    fmu_Output_Ref[i] = fmi2_import_get_variable_vr(vr_pointer);
-        //    // Print for debug
-        //    printf("Outputs : %d = %s, VR : %d \n", i, fmu_outputs[i].c_str(), fmu_Output_Ref[i] );
-        //    // Add the data broker packages
-        //    dbPackage.add("Outputs/"+fmu_outputs[i], 0.0);
-        //  }
-        //}
-
         if(!fmu) {
       		printf("Error parsing XML, exiting\n");
       	}
@@ -183,7 +149,7 @@ namespace mars {
         fmu_GUID = fmi2_import_get_GUID(fmu);
 
         // Instanciate the fmu
-        fmu_status_jm = fmi2_import_instantiate(fmu, fmu_instanceName, fmi2_cosimulation, fmu_location, fmu_visible);
+        fmu_status_jm = fmi2_import_instantiate(fmu, fmu_instanceName, fmi2_cosimulation, NULL, fmi2_false);
         if(fmu_status_jm == jm_status_error){
           printf("fmi2_import_instantiate failed! \n");
           return;
@@ -207,9 +173,6 @@ namespace mars {
           printf("Enter initialization failed! \n");
         }
 
-        // Make the ID Mapping
-
-
         // Finish data broker config
 
         std::string groupName = "external_sim";
@@ -228,13 +191,13 @@ namespace mars {
           printf("Reset failed! \n");
         }
 
-        // Initialize the fmu
+        //// Initialize the fmu
         fmu_status = fmi2_import_enter_initialization_mode(fmu);
         if(fmu_status != fmi2_status_ok){
           printf("Enter initialization failed! \n");
         }
 
-        // Exit initialization mode
+        //// Exit initialization mode
         fmu_status = fmi2_import_exit_initialization_mode(fmu);
         if(fmu_status != fmi2_status_ok){
           printf("Enter initialization failed! \n");
@@ -245,9 +208,9 @@ namespace mars {
 
       MarsFmu::~MarsFmu() {
         // Remove from dataBroker
-        std::string groupName = "external_sim";
-        std::string dataName = "FMU/";
-        control->dataBroker->unregisterTimedProducer(this, groupName, dataName, "mars_sim/simTimer");
+        fprintf(stderr, "Destructor ! \n");
+
+        //control->dataBroker->unregisterTimedProducer(this, groupName, dataName, "mars_sim/simTimer");
 
         // Destroy the fmu
         fmi2_import_destroy_dllfmu(fmu);
@@ -258,48 +221,45 @@ namespace mars {
 
 
       void MarsFmu::update(sReal time_ms) {
+
+// SEEMS TO WORK
         // Get the input values
         for(auto mapping : mars_fmu_ID){
-            fmi2_real_t *sensorData;
+
             int numSensorValues = control->sensors->getSensorData(mapping.first, &sensorData);
             fmu_status = fmi2_import_set_real(fmu, &mapping.second, 1, sensorData);
-            free(sensorData);
+
         }
 
-        //int numSensorValues = control->sensors->getSensorData(mars_output_ids[0], &sensorData);
-        //fmu_input_values[1] = sensorData[0];
-        //printf("%d \n", numSensorValues);
-        //free(sensorData);
-        // Conversion needed because mars calculates in ms
-        while(current_time*1000 < time_ms){
-          //fmu_status = fmi2_import_set_real(fmu, fmu_Input_Ref, 2, fmu_input_values);
-          // Do a step
-          fmu_status = fmi2_import_do_step(fmu, current_time, time_step, fmi2_true);
-          // Get results
-          //fmi2_real_t values[2];
-          //fmu_status = fmi2_import_get_real(fmu, fmu_Output_Ref, 1, fmu_output_values);
-          // printf("y[0] = %2.4f \n y[1] = %2.4f", fmu_results[0], fmu_results[1]);
-          // Check if fmu feels good
-          if(fmu_status != fmi2_status_ok){
-            printf("Error during simulation! \n");
-          }
-          // Raise time
-          current_time += time_step;
-        }
+      fmi2_value_reference_t input_v = 23;
+      fmi2_real_t input_amp = 35.0;
+      // Conversion needed because mars calculates in ms
+      while(current_time*1000 < time_ms){
 
+
+        fmu_status = fmi2_import_set_real(fmu, &input_v, 1, &input_amp);
+        // Do a step
+        fmu_status = fmi2_import_do_step(fmu, current_time, time_step, fmi2_true);
+
+        // Check if fmu feels good
+        if(fmu_status != fmi2_status_ok){
+          printf("Error during simulation! \n");
+        }
+        // Raise time
+        current_time += time_step;
+      }
+
+// SEEMS TO WORK!
         // Set the output values
         for(auto mapping : fmu_mars_ID){
-          fmi2_real_t fmu_output = 0.0;
           fmu_status = fmi2_import_get_real(fmu, &mapping.first, 1, &fmu_output);
           control->motors->setMotorValue(mapping.second, fmu_output);
+          printf("Output is %2.f \n",fmu_output);
         }
-        // Set the motor value
-        //control->motors->setMotorValue(mars_input_ids[0], fmu_output_values[0]);
+
 
         // Reset internal time
         current_time = 0.0;
-        // control->motors->setMotorValue(id, value);
-
       }
 
       void MarsFmu::produceData(const data_broker::DataInfo &info,
@@ -321,17 +281,13 @@ namespace mars {
           //   }
           //  }
 
-                                    }
+                                  }
 
-      void MarsFmu::receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam){
-        // package.get("force1/x", force);
-      }
+     void MarsFmu::receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam){
+       // package.get("force1/x", force);
+     }
 
       void MarsFmu::cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property) {
-
-        if(_property.paramId == example.paramId) {
-          example.dValue = _property.dValue;
-        }
       }
 
 
