@@ -70,7 +70,7 @@ namespace mars {
         time_step = 0.001;
         stop_time_defined = fmi2_false;
         // Data broker configuration
-        typeName = "FMU";
+        typeName = "FMU/";
         data_broker::DataPackage dbPackage;
 
 
@@ -104,25 +104,22 @@ namespace mars {
           fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, mapping.second.c_str() );
           // Map the variable onto the motor
           mars_fmu_ID[control->sensors->getSensorID(mapping.first)] = fmi2_import_get_variable_vr(vr_pointer);
+          // Push the id to the mapping array
+          dataBroker_ID.push_back(fmi2_import_get_variable_vr(vr_pointer));
           // Add the data broker packages
-          dbPackage.add("Inputs/"+mapping.second, 0.0);
+          dbPackage.add(mapping.second, 0.0);
         }
 
         for(auto mapping : fmu_mars_map){
           // Find the fmu variable
           fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, mapping.first.c_str() );
           fmu_mars_ID[fmi2_import_get_variable_vr(vr_pointer)] = control->motors->getID(mapping.second);
+          // Push the id to the mapping array
+          dataBroker_ID.push_back(fmi2_import_get_variable_vr(vr_pointer));
           // Add the data broker packages
-          dbPackage.add("Outputs/"+mapping.first, 0.0);
+          dbPackage.add(mapping.first, 0.0);
         }
 
-        for(auto mapping : mars_fmu_ID){
-          printf("%d : %d \n", mapping.first, mapping.second );
-        }
-
-        for(auto mapping : fmu_mars_ID){
-          printf("%d : %d \n", mapping.first, mapping.second );
-        }
 
         if(!fmu) {
       		printf("Error parsing XML, exiting\n");
@@ -176,7 +173,7 @@ namespace mars {
         // Finish data broker config
 
         std::string groupName = "external_sim";
-        std::string dataName = "FMU/";
+        std::string dataName = typeName.append(fmu_instanceName);
 
         control->dataBroker->pushData(groupName, dataName, dbPackage, NULL, data_broker::DATA_PACKAGE_READ_FLAG);
         control->dataBroker->registerTimedProducer(this, groupName, dataName, "mars_sim/simTimer", 0);
@@ -249,12 +246,10 @@ namespace mars {
         current_time += time_step;
       }
 
-// SEEMS TO WORK!
         // Set the output values
         for(auto mapping : fmu_mars_ID){
           fmu_status = fmi2_import_get_real(fmu, &mapping.first, 1, &fmu_output);
           control->motors->setMotorValue(mapping.second, fmu_output);
-          printf("Output is %2.f \n",fmu_output);
         }
 
 
@@ -265,21 +260,18 @@ namespace mars {
       void MarsFmu::produceData(const data_broker::DataInfo &info,
                                          data_broker::DataPackage *package,
                                          int callbackParam) {
-          //int i = 0;
-          //if(!fmu_inputs[0].empty()){
-          //  for(i = 0; i < sizeof(fmu_inputs)/sizeof(fmu_inputs[0]); i++){
-          //    // Send to the data broker
-          //    package->set(i, fmu_input_values[i]);
-          //  }
-          //}
 
-          //int j = i;
-          //  if(!fmu_outputs[0].empty()){
-          //   for(i = 0; i < sizeof(fmu_outputs)/sizeof(fmu_outputs[0]); i++){
-          //     // Send to the data broker
-          //     package->set(i+j, fmu_output_values[i]);
-          //   }
-          //  }
+          for(int i = 0; i < sizeof(dataBroker_ID)/sizeof(dataBroker_ID[0]); i++){
+            fmu_status = fmi2_import_get_real(fmu, &dataBroker_ID[i], 1, &fmu_output);
+
+            // Check if fmu feels good
+            if(fmu_status != fmi2_status_ok){
+              printf("Error during simulation! \n");
+            }
+
+            package->set(i, fmu_output);
+
+          }
 
                                   }
 
