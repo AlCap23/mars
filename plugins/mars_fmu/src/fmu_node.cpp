@@ -1,26 +1,27 @@
 #include "fmu_node.h"
 
-namespace FMU_NODE{
 
-fmuNode::fmuNode(std::string filePath, std::string instanceName, std::vector<std::string> fmu_variables){
+#include <string>
+#include <map>
+#include <vector>
+
+#include <mars/cfg_manager/CFGManagerInterface.h>
+
+
+void fmu_logger(jm_callbacks* callbacks, jm_string module, jm_log_level_enu_t log_level, jm_string message){
+    printf("module = %s, log level = %s: %s\n", module, jm_log_level_to_string(log_level), message);
+}
+
+fmuNode::fmuNode(std::string filePath, std::string tmpPath ,std::string instanceName, std::vector<std::string> fmu_variables){
   // Set the fmu path
   fmu_path = filePath;
-  fmu_instanceName = instanceName;
+  fmu_instanceName = instanceName.c_str();
+
 
   // TODO Make a temp directory
-  tmp_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp";
-
-  // Clear tmp folder
-  system("exec rm -r /media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp/* ");
-
-  // Init the I/O maps without value refs
-  for(std::vector<int>::size_type i = 0; i!= fmu_variables.size(); i++){
-    // Init with -1
-    reference_map[fmu_variables[i]] = -1;
-  }
-
+  tmp_path = fmi_import_mk_temp_dir(&callbacks, tmpPath.c_str(), fmu_instanceName);
   // Init the FMU
-  this->init();
+  this->init(fmu_variables);
 
 }
 
@@ -37,35 +38,28 @@ fmuNode::~fmuNode(){
 }
 
 
-void fmuNode::fmu_logger(jm_callbacks* callbacks, jm_string module, jm_log_level_enu_t log_level, jm_string message){
-    printf("module = %s, log level = %s: %s\n", module, jm_log_level_to_string(log_level), message);
-}
+void fmuNode::init(std::vector<std::string> fmu_variables){
 
-
-void fmuNode::init(){
+  printf("0 \n");
 
   fmu_relativeTolerance = 0.001;
   current_time = 0.0;
   time_step = 0.001;
   stop_time_defined = fmi2_false;
 
-  // Data broker configuration
-  typeName = "FMU/";
-  data_broker::DataPackage dbPackage;
-
   // Setup the callbacks
   callbacks.malloc = malloc;
   callbacks.calloc = calloc;
   callbacks.realloc = realloc;
   callbacks.free = free;
-  callbacks.logger = fmuNode::fmu_logger;
-  callbacks.log_level = jm_log_level_warning;
+  callbacks.logger = fmu_logger;
+  callbacks.log_level = jm_log_level_debug;
   callbacks.context = 0;
 
   // Get context and version
   context = fmi_import_allocate_context(&callbacks);
   // Need to give c strings
-  version = fmi_import_get_fmi_version(context, fmu_path.c_str(), tmp_path.c_str());
+  version = fmi_import_get_fmi_version(context, fmu_path.c_str(), tmp_path);
 
   // Check for version of the FMU
   if(version != fmi_version_2_0_enu) {
@@ -73,20 +67,29 @@ void fmuNode::init(){
   }
 
   // Read the XML
-  fmu = fmi2_import_parse_xml(context, tmp_path.c_str(), 0);
-
+  fmu = fmi2_import_parse_xml(context, tmp_path, 0);
+  printf("1 \n");
   if(!fmu) {
     printf("Error parsing XML, exiting\n");
   }
+  printf("2 \n");
 
-  // Get the value references
-  for(auto mapping : reference_map){
-    // Find the fmu variable
-    fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, mapping.first.c_str() );
-    // Map the variable onto the motor
-    mapping.second = fmi2_import_get_variable_vr(vr_pointer);
+
+  // Init the I/O maps without value refs
+  fmi2_import_variable_t* vr_pointer;
+  for(auto it = fmu_variables.cbegin(); it != fmu_variables.cend(); it++){
+
+    // Find the value refrence
+    vr_pointer = fmi2_import_get_variable_by_name(fmu, it->c_str());
+    // TODO Check if variable is in list! otherwise segmentation error
+    fmi2_value_reference_t test = fmi2_import_get_variable_vr(vr_pointer);
+
+    reference_map.insert(std::make_pair(it->c_str(), fmi2_import_get_variable_vr(vr_pointer)));
+
   }
+  delete vr_pointer;
 
+printf("3 \n");
   // Check for FMU type (Cosim or ModelExchange)
   if(fmi2_import_get_fmu_kind(fmu) == fmi2_fmu_kind_me) {
     printf("Only CS 2.0 is supported by this code\n");
@@ -133,9 +136,11 @@ void fmuNode::init(){
   } else {
     printf("FMU initialization finished successfully! \n");
   }
+
 }
 
 void fmuNode::reset(){
+  printf("Resetting !\n");
   // Reset the fmu and the internal variables
   fmu_status = fmi2_import_reset(fmu);
   if(fmu_status != fmi2_status_ok){
@@ -158,11 +163,11 @@ void fmuNode::reset(){
 
 }
 
-void fmuNode::stepSimulation(){
-
+void fmuNode::stepSimulation(double update_time){
+  printf("Stepping \n");
   // Set the input values
-  for(auto input_map : fmu_input){
-    fmu_status = fmi2_import_set_real(fmu, &mapping.first, &mapping.second);
+  for(auto mapping : fmu_input){
+    fmu_status = fmi2_import_set_real(fmu, &mapping.first, 1 ,&mapping.second);
 
     if(fmu_status != fmi2_status_ok){
       printf("Setting input failed! \n");
@@ -178,5 +183,3 @@ void fmuNode::stepSimulation(){
   }
 
 }
-
-} // end of namespace FMU_NODE

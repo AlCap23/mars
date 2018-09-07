@@ -49,6 +49,7 @@
 
 #include <string>
 
+#include "fmu_node.h"
 #include "fmilib.h"
 
 namespace mars {
@@ -68,6 +69,7 @@ namespace mars {
       public:
         MarsFmu(lib_manager::LibManager *theManager);
         ~MarsFmu();
+
 
         // LibInterface methods
         int getLibVersion() const
@@ -98,6 +100,7 @@ namespace mars {
 
 
       private:
+        std::vector<fmuNode*> fmu_models;
         cfg_manager::cfgPropertyStruct example;
 
         // Map inputs and outputs from fmu to mars and vice versa

@@ -3,15 +3,20 @@
 
 
 #include <string>
+#include <map>
+#include <vector>
 
 #include <fmilib.h>
 #include <JM/jm_portability.h>
+
+#include <mars/interfaces/MARSDefs.h>
+
 
 class fmuNode{
 
   // Filesystem for the fmu
   std::string fmu_path;
-  std::string tmp_path;
+  char* tmp_path;
 
   // Define the variables for managing
 
@@ -44,14 +49,13 @@ class fmuNode{
 
 public:
   // Constructor and destructor
-  FMU_NODE(std::string filePath, std::string instanceName, std::vector<std::string> inputs, std::vector<std::string> outputs);
-  ~FMU_NODE();
+  fmuNode(std::string filePath,std::string tmpPath, std::string instanceName, std::vector<std::string> fmu_variables);
+  ~fmuNode();
 
   // Standard functions
-  void fmu_logger(jm_callbacks* callbacks, jm_string module, jm_log_level_enu_t log_level, jm_string message);
-  void init();
+  void init(std::vector<std::string> fmu_variables);
   void reset();
-  void stepSimulation(sReal update_time);
+  void stepSimulation(double update_time);
 };
 
 #endif
