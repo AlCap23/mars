@@ -55,28 +55,32 @@ namespace mars {
       }
 
       void MarsFmu::init() {
-
+        printf("Start plugin \n");
         fmu_instanceName = "Test_Model";
+        std::string configPath = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/fmu_mars_config.yml";
 
         // Read the Config Map
         configmaps::ConfigMap map = configmaps::ConfigMap::fromYamlFile(configPath);
-        configmaps::ConfigVector::iterator it;
-        for(it=map["marsFMU"].begin(); it!=map["marsFMU"].end(); ++it) {
-            
+        if(map.hasKey("marsFMU")){
+          printf("Detected marsFMU \n");
+          configmaps::ConfigMap fmu_mapping = map["marsFMU"];
+          for(auto fmus: fmu_mapping){
+            // Print newline
+            fprintf(stderr, "\n");
+            printf("Initialize FMU  %s \n", fmus.first.c_str());
+            configmaps::ConfigMap current_fmu = fmu_mapping[fmus.first];
+            fmu_models.push_back(new fmuNode(current_fmu, control));
+          }
         }
 
-        printf("Check class \n");
-        // NOTE The variables have to be in the model, otherwise segfault!
-        for(int i = 0; i <3; i++){
-        fmu_models.push_back(new fmuNode(fmu_path, fmu_instanceName, std::vector<std::string> {"external_torque"}));
-        }
-        printf("Working \n");
 
 
       }
 
       void MarsFmu::reset() {
-
+        for(auto models : fmu_models){
+          models->reset();
+        }
 
       }
 
@@ -86,11 +90,10 @@ namespace mars {
 
 
       void MarsFmu::update(sReal time_ms) {
-
-        for(int i = 0; i<3; i++){
-          (fmu_models[i])->stepSimulation(time_ms);
+        // Step all simulation models
+        for(auto models : fmu_models){
+          models->stepSimulation(time_ms);
         }
-
       }
 
       void MarsFmu::produceData(const data_broker::DataInfo &info,
