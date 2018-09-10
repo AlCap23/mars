@@ -5,24 +5,36 @@
 #include <map>
 #include <vector>
 
-#include <mars/cfg_manager/CFGManagerInterface.h>
+#include <mars/utils/misc.h>
+#include <configmaps/ConfigData.h>
 
 
 void fmu_logger(jm_callbacks* callbacks, jm_string module, jm_log_level_enu_t log_level, jm_string message){
     printf("module = %s, log level = %s: %s\n", module, jm_log_level_to_string(log_level), message);
 }
 
-fmuNode::fmuNode(std::string filePath, std::string tmpPath ,std::string instanceName, std::vector<std::string> fmu_variables){
+fmuNode::fmuNode(configmaps::ConfigMap fmu_config){
   // Set the fmu path
-  fmu_path = filePath;
-  fmu_instanceName = instanceName.c_str();
 
+  fmu_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/PT2.fmu";
 
-  // TODO Make a temp directory
-  tmp_path = fmi_import_mk_temp_dir(&callbacks, tmpPath.c_str(), fmu_instanceName);
-  // Init the FMU
-  this->init(fmu_variables);
+  std::string working_dir = mars::utils::getCurrentWorkingDir();
+  std::string new_dir = "tmp/mars_fmu/fmu/";
+  new_dir += std::to_string(rand() %9999);
 
+  tmp_path = mars::utils::pathJoin(working_dir, new_dir);
+
+  unsigned int result = mars::utils::createDirectory(tmp_path);
+
+  if(result==1){
+    fprintf(stderr, "Create FMU @ temporary directory %s \n", new_dir.c_str());
+    // Read config map
+    this->readConfig(fmu_configPath);
+    // Init the FMU
+    this->init(fmu_variables);
+  }else{
+    fprintf(stderr, "Could not create temporary directory for FMU %s \n", fmu_instanceName);
+  }
 }
 
 
@@ -40,8 +52,6 @@ fmuNode::~fmuNode(){
 
 void fmuNode::init(std::vector<std::string> fmu_variables){
 
-  printf("0 \n");
-
   fmu_relativeTolerance = 0.001;
   current_time = 0.0;
   time_step = 0.001;
@@ -53,13 +63,13 @@ void fmuNode::init(std::vector<std::string> fmu_variables){
   callbacks.realloc = realloc;
   callbacks.free = free;
   callbacks.logger = fmu_logger;
-  callbacks.log_level = jm_log_level_debug;
+  callbacks.log_level = jm_log_level_warning;
   callbacks.context = 0;
 
   // Get context and version
   context = fmi_import_allocate_context(&callbacks);
   // Need to give c strings
-  version = fmi_import_get_fmi_version(context, fmu_path.c_str(), tmp_path);
+  version = fmi_import_get_fmi_version(context, fmu_path.c_str(), tmp_path.c_str());
 
   // Check for version of the FMU
   if(version != fmi_version_2_0_enu) {
@@ -67,12 +77,11 @@ void fmuNode::init(std::vector<std::string> fmu_variables){
   }
 
   // Read the XML
-  fmu = fmi2_import_parse_xml(context, tmp_path, 0);
-  printf("1 \n");
+  fmu = fmi2_import_parse_xml(context, tmp_path.c_str(), 0);
+
   if(!fmu) {
     printf("Error parsing XML, exiting\n");
   }
-  printf("2 \n");
 
 
   // Init the I/O maps without value refs
@@ -89,7 +98,6 @@ void fmuNode::init(std::vector<std::string> fmu_variables){
   }
   delete vr_pointer;
 
-printf("3 \n");
   // Check for FMU type (Cosim or ModelExchange)
   if(fmi2_import_get_fmu_kind(fmu) == fmi2_fmu_kind_me) {
     printf("Only CS 2.0 is supported by this code\n");
@@ -181,5 +189,8 @@ void fmuNode::stepSimulation(double update_time){
   if(fmu_status != fmi2_status_ok){
     printf("Simulation step failed! \n");
   }
+  }
+
+  void fmuNode::readConfig(std::string configPath){
 
 }

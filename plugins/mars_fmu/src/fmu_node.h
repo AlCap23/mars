@@ -16,7 +16,7 @@ class fmuNode{
 
   // Filesystem for the fmu
   std::string fmu_path;
-  char* tmp_path;
+  std::string tmp_path;
 
   // Define the variables for managing
 
@@ -49,13 +49,14 @@ class fmuNode{
 
 public:
   // Constructor and destructor
-  fmuNode(std::string filePath,std::string tmpPath, std::string instanceName, std::vector<std::string> fmu_variables);
+  fmuNode(std::string filePath, std::string instanceName, std::vector<std::string> fmu_variables);
   ~fmuNode();
 
   // Standard functions
   void init(std::vector<std::string> fmu_variables);
   void reset();
   void stepSimulation(double update_time);
+  void readConfig(std::string configPath);
 };
 
 #endif

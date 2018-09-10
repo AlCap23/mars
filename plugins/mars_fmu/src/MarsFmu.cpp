@@ -55,16 +55,20 @@ namespace mars {
       }
 
       void MarsFmu::init() {
-        fmu_path = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/PT2.fmu";
-        tmp_path = control->cfg->getOrCreateProperty("Config", "config_path", std::string(".")).sValue;
-        fprintf(stderr, "%s\n", tmp_path.c_str());
 
         fmu_instanceName = "Test_Model";
+
+        // Read the Config Map
+        configmaps::ConfigMap map = configmaps::ConfigMap::fromYamlFile(configPath);
+        configmaps::ConfigVector::iterator it;
+        for(it=map["marsFMU"].begin(); it!=map["marsFMU"].end(); ++it) {
+            
+        }
 
         printf("Check class \n");
         // NOTE The variables have to be in the model, otherwise segfault!
         for(int i = 0; i <3; i++){
-        fmu_models.push_back(new fmuNode(fmu_path,tmp_path, fmu_instanceName, std::vector<std::string> {"external_torque"}));
+        fmu_models.push_back(new fmuNode(fmu_path, fmu_instanceName, std::vector<std::string> {"external_torque"}));
         }
         printf("Working \n");
 
@@ -82,6 +86,10 @@ namespace mars {
 
 
       void MarsFmu::update(sReal time_ms) {
+
+        for(int i = 0; i<3; i++){
+          (fmu_models[i])->stepSimulation(time_ms);
+        }
 
       }
 
