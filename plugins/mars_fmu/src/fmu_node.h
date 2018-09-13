@@ -2,10 +2,7 @@
 #define FMU_NODE_H
 
 
-#include <string>
-#include <map>
-#include <vector>
-
+#include<stdio.h>
 
 
 #include <fmilib.h>

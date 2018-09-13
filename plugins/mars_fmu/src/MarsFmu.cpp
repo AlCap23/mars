@@ -85,7 +85,9 @@ namespace mars {
       }
 
       MarsFmu::~MarsFmu() {
-
+        for(auto models : fmu_models){
+          models->~fmuNode();
+        }
       }
 
 

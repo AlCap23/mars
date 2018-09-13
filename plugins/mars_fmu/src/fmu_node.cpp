@@ -1,6 +1,5 @@
 #include "fmu_node.h"
 
-
 #include <string>
 #include <map>
 #include <vector>
@@ -39,6 +38,15 @@ fmuNode::~fmuNode(){
   fmi_import_free_context(context);
 
   // TODO Free tmp directory
+  std::string delete_command = std::string("exec rm -r ")+tmp_path+std::string("/*");
+  system(delete_command.c_str());
+
+  if(rmdir(tmp_path.c_str()) == -1){
+    fprintf(stderr, "Error while removing Directory %s\n", tmp_path.c_str());
+    fprintf(stderr, "   %s\n", strerror(errno));
+  } else{
+    fprintf(stderr, "Removed temporary directory \n");
+  }
 
   printf("Destroyed fmu! \n");
 }
@@ -129,7 +137,7 @@ void fmuNode::init(){
 }
 
 void fmuNode::reset(){
-  printf("Resetting FMU %s !\n", fmu_instanceName.c_str());
+
   // Reset the fmu and the internal variables
   fmu_status = fmi2_import_reset(fmu);
   if(fmu_status != fmi2_status_ok){
@@ -149,7 +157,7 @@ void fmuNode::reset(){
   }
 
   current_time = 0.0;
-
+  printf("Reset of FMU %s  successful!\n", fmu_instanceName.c_str());
 }
 
 void fmuNode::stepSimulation(mars::interfaces::sReal update_time){
@@ -231,6 +239,9 @@ fprintf(stderr, "Finished stepping FMU\n");
     // Set the path
     if(fmu_configMap.hasKey("fmu_path")){
       fmu_path = std::string(fmu_configMap["fmu_path"]);
+      fprintf(stderr, "Loading model from %s\n", fmu_path.c_str());
+    } else{
+      fprintf(stderr, "No model path given! \n");
     }
 
     // Get the instancce Name
