@@ -32,8 +32,6 @@ class fmuNode{
   std::string fmu_path;
   std::string tmp_path;
 
-  // Define the variables for managing
-
   // Callbacks
   jm_callbacks callbacks;
 
@@ -73,7 +71,7 @@ public:
   // Standard functions
   void init();
   void reset();
-  void stepSimulation(double update_time);
+  void stepSimulation(mars::interfaces::sReal update_time);
   void readConfig();
   void CreateMapping();
   int MapToMars(std::string VariableName);

@@ -46,10 +46,9 @@ fmuNode::~fmuNode(){
 
 void fmuNode::init(){
 
-  fmu_relativeTolerance = 0.001;
   current_time = 0.0;
-  time_step = 0.001;
   stop_time_defined = fmi2_false;
+
 
   // Setup the callbacks
   callbacks.malloc = malloc;
@@ -57,7 +56,7 @@ void fmuNode::init(){
   callbacks.realloc = realloc;
   callbacks.free = free;
   callbacks.logger = fmu_logger;
-  callbacks.log_level = jm_log_level_warning;
+  callbacks.log_level = jm_log_level_error;
   callbacks.context = 0;
 
   // Get context and version
@@ -130,7 +129,7 @@ void fmuNode::init(){
 }
 
 void fmuNode::reset(){
-  printf("Resetting !\n");
+  printf("Resetting FMU %s !\n", fmu_instanceName.c_str());
   // Reset the fmu and the internal variables
   fmu_status = fmi2_import_reset(fmu);
   if(fmu_status != fmi2_status_ok){
@@ -153,57 +152,79 @@ void fmuNode::reset(){
 
 }
 
-void fmuNode::stepSimulation(double update_time){
+void fmuNode::stepSimulation(mars::interfaces::sReal update_time){
+
+  fprintf(stderr, "Update time is %4.2f for %4.2f \n", update_time, current_time);
+
+  // Define the internal status of the fmu
+  mars::interfaces::sReal *sensorData = new mars::interfaces::sReal(0.0);
+  fmi2_real_t *current_input = new fmi2_real_t(0.0);
 
   // Set the input values
   std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
   std::vector<unsigned long>::iterator j = mars_outputs.begin();
 
   for(; i != fmu_inputs.end() && j != mars_outputs.end(); ++i, ++j){
-    mars::interfaces::sReal *sensorData;
+
     int numSensorValues = control->sensors->getSensorData(*j, &sensorData);
     // This is highly confusing for me --> pointer to begin of iterator data?
-    fmu_status = fmi2_import_set_real(fmu, &*i, 1, sensorData);
+      fmu_status = fmi2_import_set_real(fmu, &*i, 1, sensorData);
+      if(fmu_status != fmi2_status_ok){
+        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
+      }
+  }
+  free(sensorData);
+
+  //// Do a step
+  fmi2_real_t target_time = current_time + update_time;
+  while(current_time < target_time){
+
+  //if(update_time - current_time < time_step){
+  //  step_size = update_time - current_time;
+  //  fprintf(stderr, "Modified step size\n");
+  //}
+  //else {
+  //  step_size = time_step;
+  //}
+
+    fmu_status = fmi2_import_do_step(fmu, current_time, update_time, fmi2_true);
+
     if(fmu_status != fmi2_status_ok){
-      fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
+      printf("Simulation step failed! \n");
     }
-    free(sensorData);
+
+    current_time += time_step;
+
   }
 
-  // Do a step
-  while(current_time < update_time){
-  fmu_status = fmi2_import_do_step(fmu, current_time, time_step, fmi2_true);
-
-  if(fmu_status != fmi2_status_ok){
-    printf("Simulation step failed! \n");
-  }
-  current_time += time_step;
-}
-
+fprintf(stderr, "Finished stepping FMU\n");
+  // Reset the iterators
   i = fmu_outputs.begin();
   j = mars_inputs.begin();
 
   for(; i != fmu_outputs.end() && j != mars_inputs.end(); ++i, ++j){
 
     // This is highly confusing for me --> pointer to begin of iterator data?
-    mars::interfaces::sReal current_input;
-    fmu_status = fmi2_import_get_real(fmu, &*i, 1, &current_input);
 
+    fmu_status = fmi2_import_get_real(fmu, &*i, 1, current_input);
     if(fmu_status != fmi2_status_ok){
       fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
     }
+    control->motors->setMotorValue(*j, *current_input);
 
-    control->motors->setMotorValue(*j, current_input);
   }
 
-  current_time = 0.0;
+  free(current_input);
+
+  fprintf(stderr, "Finished setting Motor values \n");
+
 
   }
 
   void fmuNode::readConfig(){
     // Create temporary directory
     std::string curret_working_dir = mars::utils::getCurrentWorkingDir();
-    curret_working_dir += "/tmp";
+    curret_working_dir += "/tmp/mars_fmu";
 
     // Read the config map and set the corresponding values
 

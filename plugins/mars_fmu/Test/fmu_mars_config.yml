@@ -2,11 +2,11 @@ marsFMU:
   # First, create the instance Name
   Motor_1:
     # Path for the FMU
-    fmu_path: /media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/PT2.fmu
+    fmu_path: /media/jmartensen/Data/general/research/03_Motor_Cosim/fmu/Simple_DC.fmu
     # Instance Name for the fmu
     instanceName: Motor_1
     # Step size of the FMU, optional (Default = 1e-3)
-    step_size: 1e-3
+    step_size: 1e-2
     # Tolerance, optional ( Default = 1e-3)
     relative_tolerance: 1e-3
     # I/O mapping, searches for the key, key combination

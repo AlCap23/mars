@@ -92,7 +92,8 @@ namespace mars {
       void MarsFmu::update(sReal time_ms) {
         // Step all simulation models
         for(auto models : fmu_models){
-          models->stepSimulation(time_ms);
+          // Maybe we can change this inside the fmu?
+          models->stepSimulation(time_ms/1000.0);
         }
       }
 
