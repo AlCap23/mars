@@ -58,21 +58,27 @@ class fmuNode{
 
   fmi2_real_t current_time; // = 0.0;
   fmi2_real_t time_step; // = 1e-3;
-  fmi2_boolean_t stop_time_defined; // = fmi2_false;
 
 public:
   // Constructor and destructor
   fmuNode(configmaps::ConfigMap fmu_config, mars::interfaces::ControlCenter* ControlCenter);
   ~fmuNode();
 
-  // Standard functions
+  // Standard functions for simulation
   void init();
   void reset();
   void stepSimulation(mars::interfaces::sReal update_time);
+
+  // Initialize the mapping
   void readConfig();
   void CreateMapping();
   int MapToMars(std::string VariableName);
   void MapToFMU(std::string VariableName, int IO);
+
+  // Set the first values
+  void SetInitialValues();
+  void SetFMUInputs();
+  void SetFMUOutputs();
 };
 
 #endif

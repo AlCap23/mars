@@ -55,7 +55,6 @@ fmuNode::~fmuNode(){
 void fmuNode::init(){
 
   current_time = 0.0;
-  stop_time_defined = fmi2_false;
 
 
   // Setup the callbacks
@@ -64,7 +63,7 @@ void fmuNode::init(){
   callbacks.realloc = realloc;
   callbacks.free = free;
   callbacks.logger = fmu_logger;
-  callbacks.log_level = jm_log_level_error;
+  callbacks.log_level = jm_log_level_warning;
   callbacks.context = 0;
 
   // Get context and version
@@ -89,6 +88,8 @@ void fmuNode::init(){
     printf("Only CS 2.0 is supported by this code\n");
   }
 
+
+
   // Set callBackFunctions
   callBackFunctions.logger = fmi2_log_forwarding;
   callBackFunctions.allocateMemory = calloc;
@@ -111,14 +112,14 @@ void fmuNode::init(){
     return;
   }
 
+  // Creates the mappings and sets the initial values
+  this->CreateMapping();
+
   // Initialize with the step size as an end time!
-  fmu_status = fmi2_import_setup_experiment(fmu, fmi2_true, fmu_relativeTolerance, current_time, stop_time_defined, time_step);
+  fmu_status = fmi2_import_setup_experiment(fmu, fmi2_true, fmu_relativeTolerance, current_time, fmi2_false, 0.0);
   if(fmu_status != fmi2_status_ok){
     printf("Setup experiment failed! \n");
   }
-
-
-  this->CreateMapping();
 
   // Initialize the fmu
   fmu_status = fmi2_import_enter_initialization_mode(fmu);
@@ -126,12 +127,14 @@ void fmuNode::init(){
     printf("Enter initialization failed! \n");
   }
 
+  this->SetInitialValues();
+
   // Exit initialization mode
   fmu_status = fmi2_import_exit_initialization_mode(fmu);
   if(fmu_status != fmi2_status_ok){
     printf("Exit initialization failed! \n");
   } else {
-    printf("FMU initialization finished successfully! \n");
+    printf("FMU initialization of %s finished successfully! \n", fmu_instanceName.c_str());
   }
 
 }
@@ -157,6 +160,8 @@ void fmuNode::reset(){
   }
 
   current_time = 0.0;
+  this->SetInitialValues();
+  this->SetFMUInputs();
   printf("Reset of FMU %s  successful!\n", fmu_instanceName.c_str());
 }
 
@@ -164,68 +169,28 @@ void fmuNode::stepSimulation(mars::interfaces::sReal update_time){
 
   fprintf(stderr, "Update time is %4.2f for %4.2f \n", update_time, current_time);
 
-  // Define the internal status of the fmu
-  mars::interfaces::sReal *sensorData = new mars::interfaces::sReal(0.0);
-  fmi2_real_t *current_input = new fmi2_real_t(0.0);
+  // Get and set all sensor values
+  this->SetFMUInputs();
 
-  // Set the input values
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
-  std::vector<unsigned long>::iterator j = mars_outputs.begin();
+  while(current_time<update_time){
 
-  for(; i != fmu_inputs.end() && j != mars_outputs.end(); ++i, ++j){
-
-    int numSensorValues = control->sensors->getSensorData(*j, &sensorData);
-    // This is highly confusing for me --> pointer to begin of iterator data?
-      fmu_status = fmi2_import_set_real(fmu, &*i, 1, sensorData);
-      if(fmu_status != fmi2_status_ok){
-        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
-      }
-  }
-  free(sensorData);
-
-  //// Do a step
-  fmi2_real_t target_time = current_time + update_time;
-  while(current_time < target_time){
-
-  //if(update_time - current_time < time_step){
-  //  step_size = update_time - current_time;
-  //  fprintf(stderr, "Modified step size\n");
-  //}
-  //else {
-  //  step_size = time_step;
-  //}
-
-    fmu_status = fmi2_import_do_step(fmu, current_time, update_time, fmi2_true);
+    fmu_status = fmi2_import_do_step(fmu, current_time, time_step, fmi2_true);
 
     if(fmu_status != fmi2_status_ok){
       printf("Simulation step failed! \n");
     }
 
     current_time += time_step;
-
-  }
-
-fprintf(stderr, "Finished stepping FMU\n");
-  // Reset the iterators
-  i = fmu_outputs.begin();
-  j = mars_inputs.begin();
-
-  for(; i != fmu_outputs.end() && j != mars_inputs.end(); ++i, ++j){
-
-    // This is highly confusing for me --> pointer to begin of iterator data?
-
-    fmu_status = fmi2_import_get_real(fmu, &*i, 1, current_input);
-    if(fmu_status != fmi2_status_ok){
-      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
     }
-    control->motors->setMotorValue(*j, *current_input);
+  current_time = 0.0;
 
-  }
 
-  free(current_input);
+  fprintf(stderr, "Finished stepping FMU\n");
+
+  // Synchronize with mars
+  this->SetFMUOutputs();
 
   fprintf(stderr, "Finished setting Motor values \n");
-
 
   }
 
@@ -239,7 +204,7 @@ fprintf(stderr, "Finished stepping FMU\n");
     // Set the path
     if(fmu_configMap.hasKey("fmu_path")){
       fmu_path = std::string(fmu_configMap["fmu_path"]);
-      fprintf(stderr, "Loading model from %s\n", fmu_path.c_str());
+      fprintf(stderr, " Loading model from %s\n", fmu_path.c_str());
     } else{
       fprintf(stderr, "No model path given! \n");
     }
@@ -258,6 +223,7 @@ fprintf(stderr, "Finished stepping FMU\n");
     // Set the step size if given
     if(fmu_configMap.hasKey("step_size")){
       time_step = double(fmu_configMap["step_size"]);
+      fprintf(stderr, "Step size : %g\n", time_step);
     } else {
       time_step = 0.001;
     }
@@ -275,26 +241,10 @@ fprintf(stderr, "Finished stepping FMU\n");
       fprintf(stderr, "Failed to create temporary directory %s\n", tmp_path.c_str());
     }
 
-    fprintf(stderr, "Finished processing %s\n", fmu_instanceName.c_str());
 }
 
 
 void fmuNode::CreateMapping(){
-
-
-  // Init the I/O maps without value refs
-//  fmi2_import_variable_t* vr_pointer;
-//  for(auto it = fmu_variables.cbegin(); it != fmu_variables.cend(); it++){
-//
-//    // Find the value refrence
-//    vr_pointer = fmi2_import_get_variable_by_name(fmu, it->c_str());
-//    // TODO Check if variable is in list! otherwise segmentation error
-//    fmi2_value_reference_t test = fmi2_import_get_variable_vr(vr_pointer);
-//
-//    reference_map.insert(std::make_pair(it->c_str(), fmi2_import_get_variable_vr(vr_pointer)));
-//
-//  }
-//  delete vr_pointer;
 
   // READ IO MAP
   if(fmu_configMap.hasKey("io_mapping")){
@@ -331,22 +281,7 @@ void fmuNode::CreateMapping(){
     }
   } // End of observed
 
-  if(fmu_configMap.hasKey("initial_values")){
-    configmaps::ConfigMap initialValues = fmu_configMap["initial_values"];
-    for(auto initialVal : initialValues){
-      fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, (initialVal.first).c_str());
-      if(vr_pointer){
-          fmi2_value_reference_t vr = fmi2_import_get_variable_vr(vr_pointer);
-          fmi2_real_t init_val = double(initialVal.second);
-          fprintf(stderr, " FMU Initial Value : %s = %4.2f\n", (initialVal.first).c_str(), initialVal.second);
-          fmu_status = fmi2_import_set_real(fmu, &vr, 1, &init_val);
 
-          if(fmu_status != fmi2_status_ok){
-            fprintf(stderr, "Setting FMU initial value of instance %s failed! \n", fmu_instanceName.c_str());
-          }
-        }
-    }
-  }
   // Print newline
   fprintf(stderr, "\n");
 }
@@ -363,7 +298,7 @@ int fmuNode::MapToMars(std::string VariableName){
   else if(control->sensors->getSensorID(VariableName)){
     // Clearly output from mars
     fprintf(stderr, " Mars Output : %s\n", VariableName.c_str());
-    mars_inputs.push_back(control->sensors->getSensorID(VariableName));
+    mars_outputs.push_back(control->sensors->getSensorID(VariableName));
     // if output from mars, the fmu is a corresponding input
     return 1;
   }
@@ -378,6 +313,7 @@ void fmuNode::MapToFMU(std::string VariableName, int IO){
   fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, VariableName.c_str());
   if(vr_pointer){
     if(IO == 1){
+      // Here the inputs to the fmu get stored
       fprintf(stderr, " FMU Input : %s\n", VariableName.c_str());
       fmu_inputs.push_back(fmi2_import_get_variable_vr(vr_pointer));
     }
@@ -392,5 +328,97 @@ void fmuNode::MapToFMU(std::string VariableName, int IO){
   } else{
     fprintf(stderr, "No variable named %s found in FMU\n", VariableName.c_str());
   }
+}
 
+void fmuNode::SetInitialValues(){
+  // This functions sets all initial values for the fmu in- and outputs
+
+  fprintf(stderr, "Setting initial values for the FMU plugin. \n");
+
+  // Set all initial sensor values
+  this->SetFMUInputs();
+
+  // Set all the initial values given in the config
+  if(fmu_configMap.hasKey("initial_values")){
+    configmaps::ConfigMap initialValues = fmu_configMap["initial_values"];
+    for(auto initialVal : initialValues){
+      fmi2_import_variable_t* vr_pointer = fmi2_import_get_variable_by_name(fmu, (initialVal.first).c_str());
+      if(vr_pointer){
+          fmi2_value_reference_t vr = fmi2_import_get_variable_vr(vr_pointer);
+          fmi2_real_t init_val = double(initialVal.second);
+          fprintf(stderr, " FMU Initial Value : %s = %g \n", (initialVal.first).c_str(), init_val);
+          fmu_status = fmi2_import_set_real(fmu, &vr, 1, &init_val);
+
+          if(fmu_status != fmi2_status_ok){
+            fprintf(stderr, "Setting FMU initial value of instance %s failed! \n", fmu_instanceName.c_str());
+          }
+        }
+    }
+  }
+
+  // Set all the initial outputs to zero
+  // Init the iterators
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_outputs.begin();
+  std::vector<unsigned long>::iterator j = mars_inputs.begin();
+
+  fmi2_real_t current_input = 0.0;
+
+  for(; i != fmu_outputs.end() && j != mars_inputs.end(); ++i, ++j){
+    // This is highly confusing for me --> pointer to begin of iterator data?
+    fprintf(stderr, " Set FMU output %d to %g \n", *i, current_input);
+    fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &current_input);
+    if(fmu_status != fmi2_status_ok){
+      fprintf(stderr, "Setting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+    }
+    control->motors->setMotorValue(*j, current_input);
+  }
+  //
+}
+
+
+void fmuNode::SetFMUInputs(){
+  // Set all internal data from mars to the fmu
+
+  // Define the internal status of the fmu
+  mars::interfaces::sReal *sensorData = NULL;
+
+
+  // Set the input values
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
+  std::vector<unsigned long>::iterator j = mars_outputs.begin();
+
+  for(; i != fmu_inputs.end() && j != mars_outputs.end(); ++i, ++j){
+
+    int numSensorValues = control->sensors->getSensorData(*j, &sensorData);
+
+    if(sensorData){
+      fprintf(stderr, " Sensor Data %d , %g\n", *j, sensorData[0]);
+    // This is highly confusing for me --> pointer to begin of iterator data?
+      fmu_status = fmi2_import_set_real(fmu, &*i, 1, sensorData);
+      if(fmu_status != fmi2_status_ok){
+        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
+      }
+    }
+  }
+  free(sensorData);
+}
+
+void fmuNode::SetFMUOutputs(){
+  // Reset the iterators
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_outputs.begin();
+  std::vector<unsigned long>::iterator j = mars_inputs.begin();
+
+  fmi2_real_t current_input = 0.0;
+
+  for(; i != fmu_outputs.end() && j != mars_inputs.end(); ++i, ++j){
+
+    // This is highly confusing for me --> pointer to begin of iterator data?
+    fprintf(stderr, "%d \n", *i);
+    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_input);
+    fprintf(stderr, "Motor Data %d , %g\n", *j, double(current_input));
+    if(fmu_status != fmi2_status_ok){
+      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+    }
+    control->motors->setMotorValue(*j, current_input);
+  }
 }
