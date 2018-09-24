@@ -29,7 +29,11 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   // Save the control
   mars::interfaces::ControlCenter *control;
   // Data broker
-  mars::data_broker::DataPackage dbPackage;
+  mars::data_broker::DataPackage producerPackage;
+  mars::data_broker::DataPackage receiverPackage;
+  std::string producerGroup, receiverGroup;
+  std::string producerData, receiverData;
+  unsigned long producerID, receiverID;
 
   // Filesystem for the fmu
   std::string fmu_path;
@@ -56,11 +60,14 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   // From mars to fmu
   std::vector<unsigned long> mars_outputs;
   std::vector<fmi2_value_reference_t> fmu_inputs;
+  std::vector<std::string> fmu_input_names;
   // From fmu to mars
   std::vector<unsigned long> mars_inputs;
   std::vector<fmi2_value_reference_t> fmu_outputs;
+  std::vector<std::string> fmu_output_names;
   // From fmu to data broker
   std::vector<fmi2_value_reference_t> fmu_observed;
+  std::vector<std::string> fmu_observed_names;
 
   fmi2_real_t current_time; // = 0.0;
   fmi2_real_t time_step;    // = 1e-3;
@@ -86,14 +93,10 @@ public:
   // Initialize the mapping
   void readConfig();
   void CreateMapping();
-  int MapToMars(std::string VariableName);
   void MapToFMU(std::string VariableName, int IO);
   void RegisterDataBroker();
 
   // Set the first values
   void SetInitialValues();
-  void SetFMUInputs();
-  void SetFMUOutputs();
 };
-
 #endif

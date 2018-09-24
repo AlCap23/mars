@@ -9,11 +9,12 @@ marsFMU:
     step_size: 5e-4
     # Tolerance, optional ( Default = 1e-3)
     relative_tolerance: 1e-10
-    # I/O mapping, searches for the key, key combination
-    # Namely FMU <-> MARS coupling
-    io_mapping:
-      external_torque : joint_torque
-      output_speed : joint_motor
+    # Input for the fmu
+    inputs:
+      - external_torque
+    # Outputs for the fmu
+    outputs:
+      - output_speed
     # Observed variables which are connected to the data broker
     observed:
       - output_speed

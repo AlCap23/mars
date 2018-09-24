@@ -53,7 +53,7 @@ fmuNode::~fmuNode()
 
   // Unregister the data broker
   control->dataBroker->unregisterTimedProducer(this, "*", "*", "mars_sim/simTimer");
-  control->dataBroker->unregisterTimedReceiver(this, "*", "*", "mars_sim/simTimer");
+  control->dataBroker->unregisterSyncReceiver(this, "*", "*");
 
   printf("Destroyed fmu! \n");
 }
@@ -181,16 +181,13 @@ void fmuNode::reset()
 
   current_time = 0.0;
   this->SetInitialValues();
-  this->SetFMUInputs();
   printf("Reset of FMU %s  successful!\n", fmu_instanceName.c_str());
 }
 
 void fmuNode::stepSimulation(mars::interfaces::sReal update_time)
 {
-
   // Get the modulo of the current time -> fitting time step of the simulation and fmu
   double current_target = fmod(time_step, update_time);
-
   if (current_target < time_step)
   {
     fmu_status = fmi2_import_do_step(fmu, current_time, current_target, fmi2_true);
@@ -204,7 +201,7 @@ void fmuNode::stepSimulation(mars::interfaces::sReal update_time)
   }
 
   // Get and set all sensor values
-  this->SetFMUInputs();
+  //this->SetFMUInputs();
 
   // Step in the current communication window
   while (current_time < update_time)
@@ -224,7 +221,7 @@ void fmuNode::stepSimulation(mars::interfaces::sReal update_time)
   //fprintf(stderr, "Finished stepping FMU\n");
 
   // Synchronize with mars
-  this->SetFMUOutputs();
+  //this->SetFMUOutputs();
 
   //fprintf(stderr, "Finished setting Motor values \n");
 }
@@ -287,43 +284,36 @@ void fmuNode::readConfig()
   {
     fprintf(stderr, "Failed to create temporary directory %s\n", tmp_path.c_str());
   }
+
+  // Names for data broker
+  producerGroup = "mars_fmu";
+  receiverGroup = "mars_fmu";
+
+  producerData = fmu_instanceName;
+  receiverData = "cmd_" + fmu_instanceName;
 }
 
 void fmuNode::CreateMapping()
 {
-
-  // READ IO MAP
-  if (fmu_configMap.hasKey("io_mapping"))
+  // Read the inputs
+  if (fmu_configMap.hasKey("inputs"))
   {
-    configmaps::ConfigMap ioMaps = fmu_configMap["io_mapping"];
-    std::string first_key;
-    std::string second_key;
-    // Iterate over the map
-    for (auto ioMapping : ioMaps)
+    for (auto Variable : fmu_configMap["inputs"])
     {
-      first_key = std::string(ioMapping.first);
-      second_key = std::string(ioMapping.second);
+      std::string VariableName = std::string(Variable);
+      this->MapToFMU(VariableName, 1);
+    }
+  } // End of inputs
 
-      // Check if either first key is in mars
-      int IO = this->MapToMars(first_key);
-      // If first key is found in mars, than find second key in FMU
-      if (IO > 0)
-      {
-        this->MapToFMU(second_key, IO);
-      }
-      // If first key is not found in mars, check if second key can be found
-      else
-      {
-        IO = this->MapToMars(second_key);
-        if (IO > 0)
-        {
-          // Then the first key should be in FMU
-          this->MapToFMU(first_key, IO);
-        }
-      }
-
-    } // End of iterator through IO Maps
-  }   // End of IO mapping
+  // Read the outputs
+  if (fmu_configMap.hasKey("outputs"))
+  {
+    for (auto Variable : fmu_configMap["outputs"])
+    {
+      std::string VariableName = std::string(Variable);
+      this->MapToFMU(VariableName, 2);
+    }
+  } // End of outputs
 
   // Read the observed variables
   if (fmu_configMap.hasKey("observed"))
@@ -339,31 +329,6 @@ void fmuNode::CreateMapping()
   fprintf(stderr, "\n");
 }
 
-int fmuNode::MapToMars(std::string VariableName)
-{
-  if (control->motors->getID(VariableName) > 0)
-  {
-    // Clearly Input to mars
-    fprintf(stderr, " Mars Input : %s\n", VariableName.c_str());
-    mars_inputs.push_back(control->motors->getID(VariableName));
-    // If input to mars, then the fmu is a corresponding output
-    return 2;
-  }
-  else if (control->sensors->getSensorID(VariableName))
-  {
-    // Clearly output from mars
-    fprintf(stderr, " Mars Output : %s\n", VariableName.c_str());
-    mars_outputs.push_back(control->sensors->getSensorID(VariableName));
-    // if output from mars, the fmu is a corresponding input
-    return 1;
-  }
-  else
-  {
-    // Else
-    return -1;
-  }
-}
-
 void fmuNode::MapToFMU(std::string VariableName, int IO)
 {
   // TODO register as timed producer!
@@ -376,22 +341,25 @@ void fmuNode::MapToFMU(std::string VariableName, int IO)
       fprintf(stderr, " FMU Input : %s\n", VariableName.c_str());
       fmu_inputs.push_back(fmi2_import_get_variable_vr(vr_pointer));
       // Add this to the databroker
-      dbPackage.add(std::string("inputs/") + VariableName, 0.0);
+      receiverPackage.add("inputs/" + VariableName, 0.0);
+      fmu_input_names.push_back("inputs/" + VariableName);
     }
     else if (IO == 2)
     {
       fprintf(stderr, " FMU Output : %s\n", VariableName.c_str());
       fmu_outputs.push_back(fmi2_import_get_variable_vr(vr_pointer));
       // Add this to the databroker
-      dbPackage.add(std::string("outputs/") + VariableName, 0.0);
+      producerPackage.add("outputs/" + VariableName, 0.0);
+      fmu_output_names.push_back("outputs/" + VariableName);
     }
     else if (IO == 3)
     {
       fprintf(stderr, " FMU Observed : %s\n", VariableName.c_str());
       fmu_observed.push_back(fmi2_import_get_variable_vr(vr_pointer));
+      fmu_observed_names.push_back("observed/" + VariableName);
 
       // Add this to the databroker
-      dbPackage.add(std::string("observed/") + VariableName, 0.0);
+      producerPackage.add("observed/" + VariableName, 0.0);
     }
   }
   else
@@ -407,7 +375,7 @@ void fmuNode::SetInitialValues()
   fprintf(stderr, "Setting initial values for the FMU plugin. \n");
 
   // Set all initial sensor values
-  this->SetFMUInputs();
+  //this->SetFMUInputs();
 
   // Set all the initial values given in the config
   if (fmu_configMap.hasKey("initial_values"))
@@ -452,71 +420,20 @@ void fmuNode::SetInitialValues()
   //
 }
 
-void fmuNode::SetFMUInputs()
-{
-  // Set all internal data from mars to the fmu
-
-  // Define the internal status of the fmu
-  mars::interfaces::sReal *sensorData = NULL;
-
-  // Set the input values
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
-  std::vector<unsigned long>::iterator j = mars_outputs.begin();
-
-  for (; i != fmu_inputs.end() && j != mars_outputs.end(); ++i, ++j)
-  {
-
-    int numSensorValues = control->sensors->getSensorData(*j, &sensorData);
-
-    if (sensorData)
-    {
-      //fprintf(stderr, " Sensor Data %d , %g\n", *j, sensorData[0]);
-      // This is highly confusing for me --> pointer to begin of iterator data?
-      fmu_status = fmi2_import_set_real(fmu, &*i, 1, sensorData);
-      if (fmu_status != fmi2_status_ok)
-      {
-        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
-      }
-    }
-  }
-  free(sensorData);
-}
-
-void fmuNode::SetFMUOutputs()
-{
-  // Reset the iterators
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_outputs.begin();
-  std::vector<unsigned long>::iterator j = mars_inputs.begin();
-
-  fmi2_real_t current_input = 0.0;
-
-  for (; i != fmu_outputs.end() && j != mars_inputs.end(); ++i, ++j)
-  {
-    // This is highly confusing for me --> pointer to begin of iterator data?
-    //fprintf(stderr, "%d \n", *i);
-    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_input);
-    //fprintf(stderr, "Motor Data %d , %g\n", *j, double(current_input));
-    if (fmu_status != fmi2_status_ok)
-    {
-      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
-    }
-    control->motors->setMotorValue(*j, current_input);
-  }
-}
-
 void fmuNode::produceData(const mars::data_broker::DataInfo &info,
                           mars::data_broker::DataPackage *package,
                           int callbackParam)
 {
   // Reset the iterators
   std::vector<fmi2_value_reference_t>::iterator i = fmu_observed.begin();
-  int j = 0;
+  std::vector<std::string>::iterator j = fmu_observed_names.begin();
 
   fmi2_real_t current_value = 0.0;
-
-  for (; i != fmu_observed.end(); ++i, ++j)
+  long package_id = 0.0;
+  for (; i != fmu_observed.end() && j != fmu_observed_names.end(); ++i, ++j)
   {
-
+    // Get the current package name
+    package_id = package->getIndexByName(*j);
     // Get the value
     fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
     if (fmu_status != fmi2_status_ok)
@@ -525,7 +442,27 @@ void fmuNode::produceData(const mars::data_broker::DataInfo &info,
     }
 
     // Push to databroker
-    package->set(j, current_value);
+    package->set(package_id, current_value);
+  }
+
+  // Reset the iterators
+  i = fmu_outputs.begin();
+  j = fmu_output_names.begin();
+  package_id = 0.0;
+
+  for (; i != fmu_outputs.end() && j != fmu_output_names.end(); ++i, ++j)
+  {
+    // Get the current package name
+    package_id = package->getIndexByName(*j);
+    // Get the value
+    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
+    if (fmu_status != fmi2_status_ok)
+    {
+      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+    }
+
+    // Push to databroker
+    package->set(package_id, current_value);
   }
 }
 
@@ -533,21 +470,40 @@ void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
                           const mars::data_broker::DataPackage &package,
                           int callbackParam)
 {
+  // Reset the iterators
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
+  std::vector<std::string>::iterator j = fmu_input_names.begin();
+
+  long package_id = 0.0;
+  mars::interfaces::sReal cmd_value = 0.0;
+
+  for (; i != fmu_inputs.end() && j != fmu_input_names.end(); ++i, ++j)
+  {
+    // Get the current package name
+    package_id = package.getIndexByName(*j);
+    // Get the current value
+    package.get(package_id, &cmd_value);
+    // Set the fmu, if value is given
+    if (package_id > -1)
+    {
+      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
+      if (fmu_status != fmi2_status_ok)
+      {
+        fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+      }
+    }
+  }
 }
 
 void fmuNode::RegisterDataBroker()
 {
-  // Register to databroker
-  std::string groupName = "mars_fmu";
-  std::string dataName = fmu_instanceName + "/";
+  producerID = control->dataBroker->pushData(producerGroup, producerData, producerPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_FLAG);
 
-  control->dataBroker->pushData(groupName, dataName, dbPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_FLAG);
-
-  control->dataBroker->registerTimedProducer(this, groupName, dataName,
+  control->dataBroker->registerTimedProducer(this, producerGroup, producerData,
                                              "mars_sim/simTimer",
                                              time_step);
 
-  control->dataBroker->registerTimedReceiver(this, groupName, dataName,
-                                             "mars_sim/simTimer",
-                                             time_step);
+  receiverID = control->dataBroker->pushData(receiverGroup, receiverData, receiverPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_WRITE_FLAG);
+
+  control->dataBroker->registerSyncReceiver(this, receiverGroup, receiverData, 0);
 }
