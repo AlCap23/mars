@@ -17,6 +17,18 @@ void fmu_logger(jm_callbacks *callbacks, jm_string module, jm_log_level_enu_t lo
   printf("module = %s, log level = %s: %s\n", module, jm_log_level_to_string(log_level), message);
 }
 
+void *createFMUThread(void *theObject)
+{
+  // Run the thread
+  ((fmuNode *)theObject)->run();
+  // Stop the thread
+  ((fmuNode *)theObject)->stopThread();
+  // Create a message
+  fprintf(stderr, "Thread stopped! \n");
+  pthread_exit(NULL);
+  return 0;
+}
+
 fmuNode::fmuNode(configmaps::ConfigMap fmu_config, mars::interfaces::ControlCenter *ControlCenter)
 {
   // Set the config Map
@@ -28,10 +40,25 @@ fmuNode::fmuNode(configmaps::ConfigMap fmu_config, mars::interfaces::ControlCent
   this->readConfig();
   // Init the FMU
   this->init();
+
+  // Init the threading
+  pthread_mutex_init(&fmu_thread_Mutex, NULL);
+  pthread_create(&fmu_thread, NULL, createFMUThread, (void *)this);
 }
 
 fmuNode::~fmuNode()
 {
+  // Stop the thread
+  stop_thread = true;
+  // Wait for thread to stop
+  while (thread_running)
+  {
+#ifdef WIN32
+    Sleep(10);
+#else
+    usleep(10000);
+#endif
+  }
   // Destroy the fmu
   fmi2_import_destroy_dllfmu(fmu);
   fmi2_import_free(fmu);
@@ -184,10 +211,41 @@ void fmuNode::reset()
   printf("Reset of FMU %s  successful!\n", fmu_instanceName.c_str());
 }
 
-void fmuNode::stepSimulation(mars::interfaces::sReal update_time)
+void fmuNode::update(mars::interfaces::sReal update_time)
+{
+  current_update_time = update_time;
+  do_step = true;
+  this->run();
+}
+
+void fmuNode::stopThread()
+{
+  fprintf(stderr, "Thread stopped! \n");
+  stop_thread = true;
+}
+
+void fmuNode::run()
+{
+  fprintf(stderr, "Thread set running! \n");
+  thread_running = true;
+  stop_thread = false;
+  while (!stop_thread)
+  {
+    fprintf(stderr, "Stepping \n");
+    pthread_mutex_lock(&fmu_thread_Mutex);
+    if (do_step)
+    {
+      this->stepSimulation();
+      do_step = false;
+    }
+    pthread_mutex_unlock(&fmu_thread_Mutex);
+  }
+}
+
+void fmuNode::stepSimulation()
 {
   // Get the modulo of the current time -> fitting time step of the simulation and fmu
-  double current_target = fmod(time_step, update_time);
+  double current_target = fmod(time_step, current_update_time);
   if (current_target < time_step)
   {
     fmu_status = fmi2_import_do_step(fmu, current_time, current_target, fmi2_true);
@@ -200,11 +258,8 @@ void fmuNode::stepSimulation(mars::interfaces::sReal update_time)
     current_time += current_target;
   }
 
-  // Get and set all sensor values
-  //this->SetFMUInputs();
-
   // Step in the current communication window
-  while (current_time < update_time)
+  while (current_time < current_update_time)
   {
 
     fmu_status = fmi2_import_do_step(fmu, current_time, time_step, fmi2_true);
@@ -217,13 +272,7 @@ void fmuNode::stepSimulation(mars::interfaces::sReal update_time)
     current_time += time_step;
   }
   current_time = 0.0;
-
-  //fprintf(stderr, "Finished stepping FMU\n");
-
-  // Synchronize with mars
-  //this->SetFMUOutputs();
-
-  //fprintf(stderr, "Finished setting Motor values \n");
+  this->stopThread();
 }
 
 void fmuNode::readConfig()
@@ -430,39 +479,42 @@ void fmuNode::produceData(const mars::data_broker::DataInfo &info,
 
   fmi2_real_t current_value = 0.0;
   long package_id = 0.0;
-  for (; i != fmu_observed.end() && j != fmu_observed_names.end(); ++i, ++j)
+  if (!do_step)
   {
-    // Get the current package name
-    package_id = package->getIndexByName(*j);
-    // Get the value
-    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
-    if (fmu_status != fmi2_status_ok)
+    for (; i != fmu_observed.end() && j != fmu_observed_names.end(); ++i, ++j)
     {
-      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+      // Get the current package name
+      package_id = package->getIndexByName(*j);
+      // Get the value
+      fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
+      if (fmu_status != fmi2_status_ok)
+      {
+        fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+      }
+
+      // Push to databroker
+      package->set(package_id, current_value);
     }
 
-    // Push to databroker
-    package->set(package_id, current_value);
-  }
+    // Reset the iterators
+    i = fmu_outputs.begin();
+    j = fmu_output_names.begin();
+    package_id = 0.0;
 
-  // Reset the iterators
-  i = fmu_outputs.begin();
-  j = fmu_output_names.begin();
-  package_id = 0.0;
-
-  for (; i != fmu_outputs.end() && j != fmu_output_names.end(); ++i, ++j)
-  {
-    // Get the current package name
-    package_id = package->getIndexByName(*j);
-    // Get the value
-    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
-    if (fmu_status != fmi2_status_ok)
+    for (; i != fmu_outputs.end() && j != fmu_output_names.end(); ++i, ++j)
     {
-      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
-    }
+      // Get the current package name
+      package_id = package->getIndexByName(*j);
+      // Get the value
+      fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
+      if (fmu_status != fmi2_status_ok)
+      {
+        fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+      }
 
-    // Push to databroker
-    package->set(package_id, current_value);
+      // Push to databroker
+      package->set(package_id, current_value);
+    }
   }
 }
 
@@ -470,26 +522,29 @@ void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
                           const mars::data_broker::DataPackage &package,
                           int callbackParam)
 {
-  // Reset the iterators
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
-  std::vector<std::string>::iterator j = fmu_input_names.begin();
-
-  long package_id = 0.0;
-  mars::interfaces::sReal cmd_value = 0.0;
-
-  for (; i != fmu_inputs.end() && j != fmu_input_names.end(); ++i, ++j)
+  if (!do_step)
   {
-    // Get the current package name
-    package_id = package.getIndexByName(*j);
-    // Get the current value
-    package.get(package_id, &cmd_value);
-    // Set the fmu, if value is given
-    if (package_id > -1)
+    // Reset the iterators
+    std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
+    std::vector<std::string>::iterator j = fmu_input_names.begin();
+
+    long package_id = 0.0;
+    mars::interfaces::sReal cmd_value = 0.0;
+
+    for (; i != fmu_inputs.end() && j != fmu_input_names.end(); ++i, ++j)
     {
-      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
-      if (fmu_status != fmi2_status_ok)
+      // Get the current package name
+      package_id = package.getIndexByName(*j);
+      // Get the current value
+      package.get(package_id, &cmd_value);
+      // Set the fmu, if value is given
+      if (package_id > -1)
       {
-        fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+        fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
+        if (fmu_status != fmi2_status_ok)
+        {
+          fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+        }
       }
     }
   }

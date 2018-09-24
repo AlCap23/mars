@@ -2,6 +2,7 @@
 #define FMU_NODE_H
 
 #include <stdio.h>
+#include <pthread.h>
 
 #include <fmilib.h>
 #include <JM/jm_portability.h>
@@ -34,6 +35,11 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   std::string producerGroup, receiverGroup;
   std::string producerData, receiverData;
   unsigned long producerID, receiverID;
+
+  // Threading
+  pthread_t fmu_thread;
+  pthread_mutex_t fmu_thread_Mutex;
+  bool thread_running, stop_thread, do_step;
 
   // Filesystem for the fmu
   std::string fmu_path;
@@ -69,6 +75,7 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   std::vector<fmi2_value_reference_t> fmu_observed;
   std::vector<std::string> fmu_observed_names;
 
+  mars::interfaces::sReal current_update_time;
   fmi2_real_t current_time; // = 0.0;
   fmi2_real_t time_step;    // = 1e-3;
 
@@ -80,7 +87,12 @@ public:
   // Standard functions for simulation
   void init();
   void reset();
-  void stepSimulation(mars::interfaces::sReal update_time);
+
+  // Threading
+  void run();
+  void update(mars::interfaces::sReal time_ms);
+  void stopThread();
+  void stepSimulation();
 
   virtual void produceData(const mars::data_broker::DataInfo &info,
                            mars::data_broker::DataPackage *package,

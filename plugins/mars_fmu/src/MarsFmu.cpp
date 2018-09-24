@@ -26,7 +26,6 @@
  * Version 0.1
  */
 
-
 #include "MarsFmu.h"
 #include <mars/data_broker/DataBrokerInterface.h>
 #include <mars/data_broker/DataPackage.h>
@@ -39,85 +38,87 @@
 #include <fmilib.h>
 #include <JM/jm_portability.h>
 
+namespace mars
+{
+namespace plugins
+{
+namespace mars_fmu
+{
 
+using namespace mars::utils;
+using namespace mars::interfaces;
 
-namespace mars {
-  namespace plugins {
-    namespace mars_fmu {
+MarsFmu::MarsFmu(lib_manager::LibManager *theManager)
+    : MarsPluginTemplate(theManager, "MarsFmu")
+{
+}
 
+void MarsFmu::init()
+{
+  printf("Start plugin \n");
+  fmu_instanceName = "Test_Model";
+  std::string configPath = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/fmu_mars_config.yml";
 
-      using namespace mars::utils;
-      using namespace mars::interfaces;
+  // Read the Config Map
+  configmaps::ConfigMap map = configmaps::ConfigMap::fromYamlFile(configPath);
+  if (map.hasKey("marsFMU"))
+  {
+    printf("Detected marsFMU \n");
+    configmaps::ConfigMap fmu_mapping = map["marsFMU"];
+    for (auto fmus : fmu_mapping)
+    {
+      // Print newline
+      fprintf(stderr, "\n");
+      printf("Initialize FMU  %s \n", fmus.first.c_str());
+      configmaps::ConfigMap current_fmu = fmu_mapping[fmus.first];
+      fmu_models.push_back(new fmuNode(current_fmu, control));
+    }
+  }
+}
 
+void MarsFmu::reset()
+{
+  for (auto models : fmu_models)
+  {
+    models->reset();
+  }
+}
 
-      MarsFmu::MarsFmu(lib_manager::LibManager *theManager)
-        : MarsPluginTemplate(theManager, "MarsFmu") {
-      }
+MarsFmu::~MarsFmu()
+{
+  for (auto models : fmu_models)
+  {
+    models->~fmuNode();
+  }
+}
 
-      void MarsFmu::init() {
-        printf("Start plugin \n");
-        fmu_instanceName = "Test_Model";
-        std::string configPath = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/fmu_mars_config.yml";
+void MarsFmu::update(sReal time_ms)
+{
+  // Step all simulation models
+  for (auto models : fmu_models)
+  {
+    // Maybe we can change this inside the fmu?
+    models->update(time_ms / 1000.0);
+  }
+}
 
-        // Read the Config Map
-        configmaps::ConfigMap map = configmaps::ConfigMap::fromYamlFile(configPath);
-        if(map.hasKey("marsFMU")){
-          printf("Detected marsFMU \n");
-          configmaps::ConfigMap fmu_mapping = map["marsFMU"];
-          for(auto fmus: fmu_mapping){
-            // Print newline
-            fprintf(stderr, "\n");
-            printf("Initialize FMU  %s \n", fmus.first.c_str());
-            configmaps::ConfigMap current_fmu = fmu_mapping[fmus.first];
-            fmu_models.push_back(new fmuNode(current_fmu, control));
-          }
-        }
+void MarsFmu::produceData(const data_broker::DataInfo &info,
+                          data_broker::DataPackage *package,
+                          int callbackParam)
+{
+}
 
+void MarsFmu::receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam)
+{
+  // package.get("force1/x", force);
+}
 
+void MarsFmu::cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property)
+{
+}
 
-      }
-
-      void MarsFmu::reset() {
-        for(auto models : fmu_models){
-          models->reset();
-        }
-
-      }
-
-      MarsFmu::~MarsFmu() {
-        for(auto models : fmu_models){
-          models->~fmuNode();
-        }
-      }
-
-
-      void MarsFmu::update(sReal time_ms) {
-        // Step all simulation models
-        for(auto models : fmu_models){
-          // Maybe we can change this inside the fmu?
-          models->stepSimulation(time_ms/1000.0);
-        }
-      }
-
-      void MarsFmu::produceData(const data_broker::DataInfo &info,
-                                         data_broker::DataPackage *package,
-                                         int callbackParam) {
-
-
-          }
-
-
-
-     void MarsFmu::receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam){
-       // package.get("force1/x", force);
-     }
-
-      void MarsFmu::cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property) {
-      }
-
-
-    } // end of namespace mars_fmu
-  } // end of namespace plugins
+} // end of namespace mars_fmu
+} // end of namespace plugins
 } // end of namespace mars
 
 DESTROY_LIB(mars::plugins::mars_fmu::MarsFmu);
