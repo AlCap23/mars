@@ -2,7 +2,7 @@ marsFMU:
   # First, create the instance Name
   Motor_1:
     # Path for the FMU
-    fmu_path: /media/jmartensen/Data/general/research/03_Motor_Cosim/fmu/PT2_Actuation.fmu
+    fmu_path: /media/jmartensen/Data/general/research/03_Motor_Cosim/fmu/Simple_DC_Actuation.fmu
     # Instance Name for the fmu
     instanceName: Motor_1
     # Step size of the FMU, optional (Default = 1e-3)
@@ -17,6 +17,7 @@ marsFMU:
     # Observed variables which are connected to the data broker
     observed:
       - output_speed
+      - motor_model.resistor1.i
     initial_values:
       input_voltage: 40.0
       motor_model.J_Motor : 0.21e-4
