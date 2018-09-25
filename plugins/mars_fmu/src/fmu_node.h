@@ -89,9 +89,11 @@ public:
   void reset();
 
   // Threading
-  void run();
   void update(mars::interfaces::sReal time_ms);
-  void stopThread();
+  void run();
+  void setThreadStopped();
+
+  // Simulation
   void stepSimulation();
 
   virtual void produceData(const mars::data_broker::DataInfo &info,

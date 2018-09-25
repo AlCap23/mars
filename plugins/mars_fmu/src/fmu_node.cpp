@@ -22,7 +22,7 @@ void *createFMUThread(void *theObject)
   // Run the thread
   ((fmuNode *)theObject)->run();
   // Stop the thread
-  ((fmuNode *)theObject)->stopThread();
+  ((fmuNode *)theObject)->setThreadStopped();
   // Create a message
   fprintf(stderr, "Thread stopped! \n");
   pthread_exit(NULL);
@@ -42,6 +42,9 @@ fmuNode::fmuNode(configmaps::ConfigMap fmu_config, mars::interfaces::ControlCent
   this->init();
 
   // Init the threading
+  thread_running = false;
+  stop_thread = false;
+  do_step = false;
   pthread_mutex_init(&fmu_thread_Mutex, NULL);
   pthread_create(&fmu_thread, NULL, createFMUThread, (void *)this);
 }
@@ -80,7 +83,7 @@ fmuNode::~fmuNode()
 
   // Unregister the data broker
   control->dataBroker->unregisterTimedProducer(this, "*", "*", "mars_sim/simTimer");
-  control->dataBroker->unregisterSyncReceiver(this, "*", "*");
+  control->dataBroker->unregisterTimedReceiver(this, "*", "*", "mars_sim/simTimer");
 
   printf("Destroyed fmu! \n");
 }
@@ -213,26 +216,29 @@ void fmuNode::reset()
 
 void fmuNode::update(mars::interfaces::sReal update_time)
 {
+
+  fprintf(stderr, "UPDATE \n");
+  // get the current update time
   current_update_time = update_time;
-  do_step = true;
-  this->run();
 }
 
-void fmuNode::stopThread()
+void fmuNode::setThreadStopped()
 {
-  fprintf(stderr, "Thread stopped! \n");
-  stop_thread = true;
+  if (thread_running)
+  {
+    thread_running = false;
+  }
 }
 
 void fmuNode::run()
 {
   fprintf(stderr, "Thread set running! \n");
   thread_running = true;
-  stop_thread = false;
   while (!stop_thread)
   {
-    fprintf(stderr, "Stepping \n");
+    //fprintf(stderr, "Stepping \n");
     pthread_mutex_lock(&fmu_thread_Mutex);
+    // Step until update rate is reached
     if (do_step)
     {
       this->stepSimulation();
@@ -244,8 +250,10 @@ void fmuNode::run()
 
 void fmuNode::stepSimulation()
 {
+  int i = 0;
   // Get the modulo of the current time -> fitting time step of the simulation and fmu
   double current_target = fmod(time_step, current_update_time);
+  fprintf(stderr, "Current time step : %g \n Current target time : %g \n Current time : %g \n", current_update_time, current_target, time_step);
   if (current_target < time_step)
   {
     fmu_status = fmi2_import_do_step(fmu, current_time, current_target, fmi2_true);
@@ -254,7 +262,7 @@ void fmuNode::stepSimulation()
     {
       printf("Simulation step failed! \n");
     }
-
+    i += 1;
     current_time += current_target;
   }
 
@@ -268,11 +276,11 @@ void fmuNode::stepSimulation()
     {
       printf("Simulation step failed! \n");
     }
-
+    i += 1;
     current_time += time_step;
   }
+  fprintf(stderr, "Step count: %d \n", i);
   current_time = 0.0;
-  this->stopThread();
 }
 
 void fmuNode::readConfig()
@@ -547,6 +555,8 @@ void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
         }
       }
     }
+    // Set the step flag -> new information
+    do_step = true;
   }
 }
 
@@ -560,5 +570,5 @@ void fmuNode::RegisterDataBroker()
 
   receiverID = control->dataBroker->pushData(receiverGroup, receiverData, receiverPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_WRITE_FLAG);
 
-  control->dataBroker->registerSyncReceiver(this, receiverGroup, receiverData, 0);
+  control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData, "mars_sim/simTimer", time_step);
 }
