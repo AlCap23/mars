@@ -77,6 +77,7 @@ set(SOURCES_H
        src/core/PhysicsMapper.h
        src/core/SensorManager.h
        src/core/SimEntity.h
+       src/core/SimFMU.h
        src/core/SimJoint.h
        src/core/SimMotor.h
        src/core/SimNode.h
@@ -127,6 +128,7 @@ set(TARGET_SRC
        src/core/PhysicsMapper.cpp
        src/core/SensorManager.cpp
        src/core/SimEntity.cpp
+       src/core/SimFMU.cpp
        src/core/SimJoint.cpp
        src/core/SimMotor.cpp
        src/core/SimNode.cpp
