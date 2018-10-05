@@ -38,6 +38,7 @@ set(HEADERS
     src/MotorData.h
     src/nodeState.h
     src/NodeData.h
+    src/FMUData.h
     src/sensor_bases.h
     src/sim_common.h
     src/snmesh.h
@@ -52,6 +53,7 @@ set(SOURCES
     src/sim/LoadCenter.cpp
     src/MaterialData.cpp
     src/NodeData.cpp
+    src/FMUData.cpp
     src/JointData.cpp
     src/MotorData.cpp
     src/LightData.cpp
