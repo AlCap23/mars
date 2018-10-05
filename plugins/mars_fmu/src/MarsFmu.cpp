@@ -57,23 +57,35 @@ void MarsFmu::init()
 {
   printf("Start plugin \n");
   fmu_instanceName = "Test_Model";
-  std::string configPath = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/fmu_mars_config.yml";
-
-  // Read the Config Map
-  configmaps::ConfigMap map = configmaps::ConfigMap::fromYamlFile(configPath);
-  if (map.hasKey("marsFMU"))
+  std::string confPath = control->cfg->getOrCreateProperty("Config", "config_path", ".").sValue;
+  if (pathExists(confPath + "/mars_fmu.yml"))
   {
-    printf("Detected marsFMU \n");
-    configmaps::ConfigMap fmu_mapping = map["marsFMU"];
-    for (auto fmus : fmu_mapping)
+    confPath = pathJoin(confPath, "mars_fmu.yml");
+    fprintf(stderr, "FMU Config found : %s \n", confPath.c_str());
+
+    // Read the Config Map
+    configmaps::ConfigMap map = configmaps::ConfigMap::fromYamlFile(confPath);
+    if (map.hasKey("marsFMU"))
     {
-      // Print newline
-      fprintf(stderr, "\n");
-      printf("Initialize FMU  %s \n", fmus.first.c_str());
-      configmaps::ConfigMap current_fmu = fmu_mapping[fmus.first];
-      fmu_models.push_back(new fmuNode(current_fmu, control));
+      printf("Parsing configmap \n");
+      configmaps::ConfigMap fmu_mapping = map["marsFMU"];
+      for (auto fmus : fmu_mapping)
+      {
+        // Print newline
+        fprintf(stderr, "\n");
+        printf("Initialize FMU  %s \n", fmus.first.c_str());
+        configmaps::ConfigMap current_fmu = fmu_mapping[fmus.first];
+        fmu_models.push_back(new fmuNode(current_fmu, control));
+      }
     }
   }
+  else
+  {
+    fprintf(stderr, "No config found! \n");
+    return;
+  }
+  //fprintf(stderr, "Config Path : %s \n", confPath.c_str());
+  //std::string configPath = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/fmu_mars_config.yml";
 }
 
 void MarsFmu::reset()
