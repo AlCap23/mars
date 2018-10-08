@@ -188,7 +188,17 @@ void fmuNode::init()
 
 void fmuNode::reset()
 {
-
+  // Stop the thread
+  stop_thread = true;
+  // Wait for thread to stop
+  while (thread_running)
+  {
+#ifdef WIN32
+    Sleep(0.1);
+#else
+    usleep(10);
+#endif
+  }
   // Reset the fmu and the internal variables
   fmu_status = fmi2_import_reset(fmu);
   if (fmu_status != fmi2_status_ok)
@@ -213,6 +223,13 @@ void fmuNode::reset()
   current_time = 0.0;
   this->SetInitialValues();
   printf("Reset of FMU %s  successful!\n", fmu_instanceName.c_str());
+
+  // Init the threading
+  thread_running = false;
+  stop_thread = false;
+  do_step = false;
+  pthread_mutex_init(&fmu_thread_Mutex, NULL);
+  pthread_create(&fmu_thread, NULL, createFMUThread, (void *)this);
 }
 
 void fmuNode::update(mars::interfaces::sReal update_time)
@@ -241,6 +258,7 @@ void fmuNode::run()
     pthread_mutex_lock(&fmu_thread_Mutex);
     // Step until update rate is reached
     this->stepSimulation();
+
     pthread_mutex_unlock(&fmu_thread_Mutex);
   }
 }
@@ -272,13 +290,21 @@ void fmuNode::setInputs()
   long package_id = 0.0;
   mars::interfaces::sReal cmd_value = 0.0;
 
-  for (; i != fmu_inputs.end() && j != current_inputs.end(); i++, j++)
+  for (; i != fmu_inputs.end(); i++)
   {
     // Set the input
-    fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &(*j));
-    if (fmu_status != fmi2_status_ok)
+    if (j != current_inputs.end() && !std::isnan(*j))
     {
-      fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
+      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &(*j));
+      if (fmu_status != fmi2_status_ok)
+      {
+        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
+      }
+      j++;
+    }
+    else
+    {
+      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
     }
   }
 }
@@ -501,25 +527,9 @@ void fmuNode::SetInitialValues()
     }
   }
 
-  // Set all the initial outputs to zero
-  // Init the iterators
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_outputs.begin();
-  //std::vector<unsigned long>::iterator j = mars_inputs.begin();
-
-  fmi2_real_t current_input = 0.0;
-
-  //for (; i != fmu_outputs.end() && j != mars_inputs.end(); ++i, ++j)
-  //{
-  //  // This is highly confusing for me --> pointer to begin of iterator data?
-  //  fprintf(stderr, " Set FMU output %d to %g \n", *i, current_input);
-  //  fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &current_input);
-  //  if (fmu_status != fmi2_status_ok)
-  //  {
-  //    fprintf(stderr, "Setting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
-  //  }
-  //  control->motors->setMotorValue(*j, current_input);
-  //}
-  //
+  this->setInputs();
+  this->getOutputs();
+  this->getObserved();
 }
 
 void fmuNode::produceData(const mars::data_broker::DataInfo &info,
@@ -611,6 +621,10 @@ void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
     {
       current_inputs.push_back(cmd_value);
     }
+    else
+    {
+      current_inputs.push_back(NAN);
+    }
   }
 }
 
@@ -620,9 +634,9 @@ void fmuNode::RegisterDataBroker()
 
   control->dataBroker->registerTimedProducer(this, producerGroup, producerData,
                                              "mars_sim/simTimer",
-                                             time_step);
+                                             1);
 
   receiverID = control->dataBroker->pushData(receiverGroup, receiverData, receiverPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_WRITE_FLAG);
 
-  control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData, "mars_sim/simTimer", time_step);
+  control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData, "mars_sim/simTimer", 1);
 }
