@@ -64,18 +64,19 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   jm_status_enu_t fmu_status_jm;
 
   // From mars to fmu
-  std::vector<unsigned long> mars_outputs;
+  std::vector<mars::interfaces::sReal> current_inputs;
   std::vector<fmi2_value_reference_t> fmu_inputs;
   std::vector<std::string> fmu_input_names;
   // From fmu to mars
-  std::vector<unsigned long> mars_inputs;
+  std::vector<fmi2_real_t> current_outputs;
   std::vector<fmi2_value_reference_t> fmu_outputs;
   std::vector<std::string> fmu_output_names;
   // From fmu to data broker
+  std::vector<fmi2_real_t> current_observed;
   std::vector<fmi2_value_reference_t> fmu_observed;
   std::vector<std::string> fmu_observed_names;
 
-  mars::interfaces::sReal current_update_time;
+  //mars::interfaces::sReal current_update_time;
   fmi2_real_t current_time; // = 0.0;
   fmi2_real_t time_step;    // = 1e-3;
 
@@ -94,6 +95,9 @@ public:
   void setThreadStopped();
 
   // Simulation
+  void setInputs();
+  void getOutputs();
+  void getObserved();
   void stepSimulation();
 
   virtual void produceData(const mars::data_broker::DataInfo &info,
