@@ -8,9 +8,6 @@
 #include <mars/utils/misc.h>
 
 #include <mars/interfaces/sim/ControlCenter.h>
-#include <mars/interfaces/sim/NodeManagerInterface.h>
-#include <mars/interfaces/sim/MotorManagerInterface.h>
-#include <mars/interfaces/sim/SensorManagerInterface.h>
 
 void fmu_logger(jm_callbacks *callbacks, jm_string module, jm_log_level_enu_t log_level, jm_string message)
 {
@@ -22,15 +19,17 @@ void *createFMUThread(void *theObject)
   // Run the thread
   ((fmuNode *)theObject)->run();
   // Stop the thread
-  ((fmuNode *)theObject)->setThreadStopped();
-  // Create a message
-  fprintf(stderr, "Thread stopped! \n");
+  //((fmuNode *)theObject)->setThreadStopped();
   pthread_exit(NULL);
   return 0;
 }
 
-fmuNode::fmuNode(configmaps::ConfigMap fmu_config, mars::interfaces::ControlCenter *ControlCenter)
+// CONSTRUCTOR AND DESTRUCTOR
+
+fmuNode::fmuNode(std::string Name, configmaps::ConfigMap fmu_config, mars::interfaces::ControlCenter *ControlCenter)
 {
+  // Set the instanceName
+  fmu_instanceName = Name;
   // Set the config Map
   fmu_configMap = fmu_config;
   // Set the control center
@@ -42,9 +41,7 @@ fmuNode::fmuNode(configmaps::ConfigMap fmu_config, mars::interfaces::ControlCent
   this->init();
 
   // Init the threading
-  thread_running = false;
-  stop_thread = false;
-  do_step = false;
+  step_finished = true;
   pthread_mutex_init(&fmu_thread_Mutex, NULL);
   pthread_create(&fmu_thread, NULL, createFMUThread, (void *)this);
 }
@@ -53,7 +50,9 @@ fmuNode::~fmuNode()
 {
   fprintf(stderr, "Shutting down fmu! \n");
   // Stop the thread
-  stop_thread = true;
+  this->stopSimulation();
+  this->setThreadStopped();
+
   // Wait for thread to stop
   while (thread_running)
   {
@@ -89,10 +88,247 @@ fmuNode::~fmuNode()
   printf("Destroyed fmu! \n");
 }
 
-void fmuNode::init()
+// RESET FUNCTION
+
+void fmuNode::reset()
+{
+  // Set the thread idle
+  this->stopSimulation();
+
+  // Reset the fmu and the internal variables
+  fmu_status = fmi2_import_reset(fmu);
+  if (fmu_status != fmi2_status_ok)
+  {
+    printf("Reset failed! \n");
+  }
+
+  // Initialize the fmu
+  fmu_status = fmi2_import_enter_initialization_mode(fmu);
+  if (fmu_status != fmi2_status_ok)
+  {
+    printf("Enter initialization failed on reset! \n");
+  }
+
+  //// Exit initialization mode
+  fmu_status = fmi2_import_exit_initialization_mode(fmu);
+  if (fmu_status != fmi2_status_ok)
+  {
+    printf("Exit initialization failed on reset! \n");
+  }
+
+  // Reset the local time
+  local_time = 0.0;
+  target_time = 0.0;
+
+  this->SetInitialValues();
+
+  printf("Reset of FMU %s  successful!\n", fmu_instanceName.c_str());
+}
+
+// STATUS GETTER
+
+int *fmuNode::getStatus()
+{
+  return &simulation_status;
+}
+
+fmi2_real_t *fmuNode::getTargetTime()
+{
+  return &target_time;
+}
+
+fmi2_real_t fmuNode::getStepSize()
+{
+  return time_step;
+}
+
+// THREADING
+
+void fmuNode::run()
+{
+  thread_running = true;
+  fprintf(stderr, "Thread set running! \n");
+
+  while (thread_running)
+  {
+    this->statusUpdate();
+
+    if (do_step)
+    {
+      this->stepSimulation();
+    }
+    else
+    {
+      mars::utils::msleep(1);
+    }
+  }
+}
+
+void fmuNode::setThreadStopped()
 {
 
-  current_time = 0.0;
+  // Create a message
+  fprintf(stderr, "Thread stopped! \n");
+  thread_running = false;
+}
+
+// SIMULATION
+
+void fmuNode::startSimulation()
+{
+  fprintf(stderr, "Starting FMU \n");
+  step_finished = false;
+  do_step = true;
+}
+
+void fmuNode::stopSimulation()
+{
+
+  fprintf(stderr, "Stopping FMU \n");
+  do_step = false;
+}
+
+void fmuNode::statusUpdate()
+{
+  //fprintf(stderr, "Updating Status \n");
+  // Set the simulation status
+
+  // Thread running
+  if (fmu_status != fmi2_status_ok)
+  {
+    // Error
+    simulation_status = -1;
+  }
+  else
+  {
+    // Do a step
+    if (do_step)
+    {
+      simulation_status = 1;
+    }
+    else if (step_finished)
+    {
+
+      simulation_status = 2;
+    }
+  }
+}
+
+void fmuNode::stepSimulation()
+{
+
+  target_time = local_time + time_step;
+  fprintf(stderr, "Stepping \n");
+
+  // Set the inputs
+  this->setInputs();
+
+  fmu_status = fmi2_import_do_step(fmu, local_time, time_step, fmi2_true);
+
+  if (fmu_status != fmi2_status_ok)
+  {
+    printf("Simulation step failed! \n");
+  }
+
+  // Get outputs and observed
+  this->getOutputs();
+  this->getObserved();
+
+  // Update the local time
+  local_time = target_time;
+
+  // Set simulation status
+  step_finished = true;
+  do_step = false;
+}
+
+// INPUT & OUTPUT SETTERS AND GETTERS
+
+void fmuNode::setInputs()
+{
+  pthread_mutex_lock(&fmu_thread_Mutex);
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
+  std::vector<mars::interfaces::sReal>::iterator j = current_inputs.begin();
+
+  long package_id = 0.0;
+  mars::interfaces::sReal cmd_value = 0.0;
+
+  for (; i != fmu_inputs.end(); i++)
+  {
+    // Set the input
+    if (j != current_inputs.end() && !std::isnan(*j))
+    {
+      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &(*j));
+      if (fmu_status != fmi2_status_ok)
+      {
+        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
+      }
+      j++;
+    }
+    else
+    {
+      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
+    }
+  }
+
+  pthread_mutex_unlock(&fmu_thread_Mutex);
+}
+
+void fmuNode::getOutputs()
+{
+  pthread_mutex_lock(&fmu_thread_Mutex);
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_outputs.begin();
+  current_outputs.clear();
+
+  fmi2_real_t current_value = 0.0;
+
+  for (; i != fmu_outputs.end(); i++)
+  {
+    // Get the output
+    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
+    if (fmu_status != fmi2_status_ok)
+    {
+      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
+    }
+    else
+    {
+      current_outputs.push_back(current_value);
+    }
+  }
+  pthread_mutex_unlock(&fmu_thread_Mutex);
+}
+
+void fmuNode::getObserved()
+{
+  pthread_mutex_lock(&fmu_thread_Mutex);
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_observed.begin();
+  current_observed.clear();
+
+  fmi2_real_t current_value = 0.0;
+
+  for (; i != fmu_observed.end(); i++)
+  {
+    // Get the output
+    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
+    if (fmu_status != fmi2_status_ok)
+    {
+      fprintf(stderr, "Getting FMU observed value of instance %s failed! \n", fmu_instanceName.c_str());
+    }
+    else
+    {
+      current_observed.push_back(current_value);
+    }
+  }
+  pthread_mutex_unlock(&fmu_thread_Mutex);
+}
+
+// INIT FUNCTIONS
+
+void fmuNode::init()
+{
+  // Set local time
+  local_time = 0.0;
+  target_time = local_time + time_step;
 
   // Setup the callbacks
   callbacks.malloc = malloc;
@@ -156,7 +392,7 @@ void fmuNode::init()
   this->CreateMapping();
 
   // Initialize with the step size as an end time!
-  fmu_status = fmi2_import_setup_experiment(fmu, fmi2_true, fmu_relativeTolerance, current_time, fmi2_false, 0.0);
+  fmu_status = fmi2_import_setup_experiment(fmu, fmi2_true, fmu_relativeTolerance, local_time, fmi2_false, 0.0);
   if (fmu_status != fmi2_status_ok)
   {
     printf("Setup experiment failed! \n");
@@ -183,185 +419,26 @@ void fmuNode::init()
   }
 
   // Register at Databroker
-  this->RegisterDataBroker();
-}
+  // Callled from master
 
-void fmuNode::reset()
-{
-  // Stop the thread
-  stop_thread = true;
-  // Wait for thread to stop
-  while (thread_running)
-  {
-#ifdef WIN32
-    Sleep(0.1);
-#else
-    usleep(10);
-#endif
-  }
-  // Reset the fmu and the internal variables
-  fmu_status = fmi2_import_reset(fmu);
-  if (fmu_status != fmi2_status_ok)
-  {
-    printf("Reset failed! \n");
-  }
-
-  // Initialize the fmu
-  fmu_status = fmi2_import_enter_initialization_mode(fmu);
-  if (fmu_status != fmi2_status_ok)
-  {
-    printf("Enter initialization failed on reset! \n");
-  }
-
-  //// Exit initialization mode
-  fmu_status = fmi2_import_exit_initialization_mode(fmu);
-  if (fmu_status != fmi2_status_ok)
-  {
-    printf("Exit initialization failed on reset! \n");
-  }
-
-  current_time = 0.0;
-  this->SetInitialValues();
-  printf("Reset of FMU %s  successful!\n", fmu_instanceName.c_str());
-
-  // Init the threading
-  thread_running = false;
-  stop_thread = false;
+  // Set the status
   do_step = false;
-  pthread_mutex_init(&fmu_thread_Mutex, NULL);
-  pthread_create(&fmu_thread, NULL, createFMUThread, (void *)this);
-}
+  step_finished = true;
 
-void fmuNode::update(mars::interfaces::sReal update_time)
-{
-
-  //fprintf(stderr, "UPDATE \n");
-  // get the current update time
-  //current_update_time = update_time;
-}
-
-void fmuNode::setThreadStopped()
-{
-  if (thread_running)
-  {
-    thread_running = false;
-  }
-}
-
-void fmuNode::run()
-{
-  fprintf(stderr, "Thread set running! \n");
-  thread_running = true;
-  while (!stop_thread)
-  {
-    //fprintf(stderr, "Stepping \n");
-    pthread_mutex_lock(&fmu_thread_Mutex);
-    // Step until update rate is reached
-    this->stepSimulation();
-
-    pthread_mutex_unlock(&fmu_thread_Mutex);
-  }
-}
-
-void fmuNode::stepSimulation()
-{
-  this->setInputs();
-
-  fmu_status = fmi2_import_do_step(fmu, current_time, time_step, fmi2_true);
-
-  if (fmu_status != fmi2_status_ok)
-  {
-    printf("Simulation step failed! \n");
-  }
-
-  this->getOutputs();
-  this->getObserved();
-
-  //this->setOutputs();
-
-  //current_time = 0.0;
-}
-
-void fmuNode::setInputs()
-{
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
-  std::vector<mars::interfaces::sReal>::iterator j = current_inputs.begin();
-
-  long package_id = 0.0;
-  mars::interfaces::sReal cmd_value = 0.0;
-
-  for (; i != fmu_inputs.end(); i++)
-  {
-    // Set the input
-    if (j != current_inputs.end() && !std::isnan(*j))
-    {
-      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &(*j));
-      if (fmu_status != fmi2_status_ok)
-      {
-        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
-      }
-      j++;
-    }
-    else
-    {
-      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
-    }
-  }
-}
-
-void fmuNode::getOutputs()
-{
-
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_outputs.begin();
-  current_outputs.clear();
-
-  fmi2_real_t current_value = 0.0;
-
-  for (; i != fmu_outputs.end(); i++)
-  {
-    // Get the output
-    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
-    if (fmu_status != fmi2_status_ok)
-    {
-      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
-    }
-    else
-    {
-      current_outputs.push_back(current_value);
-    }
-  }
-}
-
-void fmuNode::getObserved()
-{
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_observed.begin();
-  current_observed.clear();
-
-  fmi2_real_t current_value = 0.0;
-
-  for (; i != fmu_observed.end(); i++)
-  {
-    // Get the output
-    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
-    if (fmu_status != fmi2_status_ok)
-    {
-      fprintf(stderr, "Getting FMU observed value of instance %s failed! \n", fmu_instanceName.c_str());
-    }
-    else
-    {
-      current_observed.push_back(current_value);
-    }
-  }
+  // Set the simulation stopped
+  this->stopSimulation();
+  // Set the status
+  this->statusUpdate();
 }
 
 void fmuNode::readConfig()
 {
   // Create temporary directory
-  std::string curret_working_dir = mars::utils::getCurrentWorkingDir();
-  curret_working_dir += "/tmp/mars_fmu";
+  tmp_path = mars::utils::pathJoin(mars::utils::getCurrentWorkingDir(), "tmp/" + fmu_instanceName);
+  // Add randomness to temp path
+  tmp_path += "_" + std::to_string(random() % 999999);
 
   // Read the config map and set the corresponding values
-
   // Set the path
   if (fmu_configMap.hasKey("fmu_path"))
   {
@@ -372,20 +449,6 @@ void fmuNode::readConfig()
   {
     fprintf(stderr, "No model path given! \n");
   }
-
-  // Get the instancce Name
-  if (fmu_configMap.hasKey("instanceName"))
-  {
-    fmu_instanceName = std::string(fmu_configMap["instanceName"]);
-    tmp_path = mars::utils::pathJoin(curret_working_dir, fmu_configMap["instanceName"]);
-  }
-  else
-  {
-    fmu_instanceName = "Instance_1";
-    tmp_path = mars::utils::pathJoin(curret_working_dir, fmu_instanceName);
-  }
-  // Add randomness to temp path
-  tmp_path += std::to_string(random() % 999999);
 
   // Set the step size if given
   if (fmu_configMap.hasKey("step_size"))
@@ -532,10 +595,30 @@ void fmuNode::SetInitialValues()
   this->getObserved();
 }
 
+// DATA BROKER FUNCTIONS
+
+void fmuNode::RegisterDataBroker(int interval)
+{
+  communication_interval = interval;
+  fprintf(stderr, "%s  : interval is %d \n", fmu_instanceName.c_str(), interval);
+
+  producerID = control->dataBroker->pushData(producerGroup, producerData, producerPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_FLAG);
+
+  control->dataBroker->registerTimedProducer(this, producerGroup, producerData,
+                                             "mars_fmu/simTimer",
+                                             interval);
+
+  receiverID = control->dataBroker->pushData(receiverGroup, receiverData, receiverPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_WRITE_FLAG);
+
+  // TODO mars_fmu/simTimer
+  control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData, "mars_fmu/simTimer", interval);
+}
+
 void fmuNode::produceData(const mars::data_broker::DataInfo &info,
                           mars::data_broker::DataPackage *package,
                           int callbackParam)
 {
+  pthread_mutex_lock(&fmu_thread_Mutex);
   // Reset the iterators
   long package_id = 0.0;
   //std::vector<fmi2_value_reference_t>::iterator i = fmu_observed.begin();
@@ -556,55 +639,14 @@ void fmuNode::produceData(const mars::data_broker::DataInfo &info,
     package_id = package->getIndexByName(*k);
     package->set(package_id, *j);
   }
-
-  //std::vector<std::string>::iterator j = fmu_observed_names.begin();
-  //
-  //fmi2_real_t current_value = 0.0;
-  //long package_id = 0.0;
-  //if (!do_step)
-  //{
-  //  for (; i != fmu_observed.end() && j != fmu_observed_names.end(); ++i, ++j)
-  //  {
-  //    // Get the current package name
-  //    package_id = package->getIndexByName(*j);
-  //    // Get the value
-  //    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
-  //    if (fmu_status != fmi2_status_ok)
-  //    {
-  //      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
-  //    }
-  //
-  //    // Push to databroker
-  //    package->set(package_id, current_value);
-  //  }
-  //
-  //  // Reset the iterators
-  //  i = fmu_outputs.begin();
-  //  j = fmu_output_names.begin();
-  //  package_id = 0.0;
-  //
-  //  for (; i != fmu_outputs.end() && j != fmu_output_names.end(); ++i, ++j)
-  //  {
-  //    // Get the current package name
-  //    package_id = package->getIndexByName(*j);
-  //    // Get the value
-  //    fmu_status = fmi2_import_get_real(fmu, &(*i), 1, &current_value);
-  //    if (fmu_status != fmi2_status_ok)
-  //    {
-  //      fprintf(stderr, "Getting FMU output value of instance %s failed! \n", fmu_instanceName.c_str());
-  //    }
-  //
-  //    // Push to databroker
-  //    package->set(package_id, current_value);
-  //  }
-  //}
-  return;
+  pthread_mutex_unlock(&fmu_thread_Mutex);
 }
 
 void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
                           const mars::data_broker::DataPackage &package,
                           int callbackParam)
 {
+  pthread_mutex_lock(&fmu_thread_Mutex);
   // Reset the iterator
   std::vector<std::string>::iterator i = fmu_input_names.begin();
   current_inputs.clear();
@@ -626,17 +668,6 @@ void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
       current_inputs.push_back(NAN);
     }
   }
-}
-
-void fmuNode::RegisterDataBroker()
-{
-  producerID = control->dataBroker->pushData(producerGroup, producerData, producerPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_FLAG);
-
-  control->dataBroker->registerTimedProducer(this, producerGroup, producerData,
-                                             "mars_sim/simTimer",
-                                             1);
-
-  receiverID = control->dataBroker->pushData(receiverGroup, receiverData, receiverPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_WRITE_FLAG);
-
-  control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData, "mars_sim/simTimer", 1);
+  pthread_mutex_unlock(&fmu_thread_Mutex);
+  this->startSimulation();
 }

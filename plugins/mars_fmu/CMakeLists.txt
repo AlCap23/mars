@@ -33,11 +33,13 @@ include_directories(
 set(SOURCES
 	src/MarsFmu.cpp
 	src/fmu_node.cpp
+	src/fmu_master.cpp
 )
 
 set(HEADERS
 	src/MarsFmu.h
 	src/fmu_node.h
+	src/fmu_master.h
 )
 
 

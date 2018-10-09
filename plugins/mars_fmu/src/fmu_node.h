@@ -17,9 +17,6 @@
 #include <mars/data_broker/DataBrokerInterface.h>
 
 #include <mars/interfaces/sim/ControlCenter.h>
-#include <mars/interfaces/sim/NodeManagerInterface.h>
-#include <mars/interfaces/sim/MotorManagerInterface.h>
-#include <mars/interfaces/sim/SensorManagerInterface.h>
 
 class fmuNode : public mars::data_broker::ProducerInterface,
                 public mars::data_broker::ReceiverInterface
@@ -39,7 +36,8 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   // Threading
   pthread_t fmu_thread;
   pthread_mutex_t fmu_thread_Mutex;
-  bool thread_running, stop_thread, do_step;
+  int simulation_status, communication_interval;
+  bool thread_running, do_step, step_finished;
 
   // Filesystem for the fmu
   std::string fmu_path;
@@ -63,27 +61,33 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   fmi2_status_t fmu_status;
   jm_status_enu_t fmu_status_jm;
 
-  // From mars to fmu
+  // Input values
   std::vector<mars::interfaces::sReal> current_inputs;
   std::vector<fmi2_value_reference_t> fmu_inputs;
   std::vector<std::string> fmu_input_names;
-  // From fmu to mars
+  // Output values
   std::vector<fmi2_real_t> current_outputs;
   std::vector<fmi2_value_reference_t> fmu_outputs;
   std::vector<std::string> fmu_output_names;
-  // From fmu to data broker
+  // Observed variables
   std::vector<fmi2_real_t> current_observed;
   std::vector<fmi2_value_reference_t> fmu_observed;
   std::vector<std::string> fmu_observed_names;
 
   //mars::interfaces::sReal current_update_time;
-  fmi2_real_t current_time; // = 0.0;
-  fmi2_real_t time_step;    // = 1e-3;
+  fmi2_real_t local_time; // = 0.0;
+  fmi2_real_t time_step;  // = 1e-3;
+  fmi2_real_t target_time;
 
 public:
   // Constructor and destructor
-  fmuNode(configmaps::ConfigMap fmu_config, mars::interfaces::ControlCenter *ControlCenter);
+  fmuNode(std::string Name, configmaps::ConfigMap fmu_config, mars::interfaces::ControlCenter *ControlCenter);
   ~fmuNode();
+
+  // Getter
+  int *getStatus();
+  fmi2_real_t *getTargetTime();
+  fmi2_real_t getStepSize();
 
   // Standard functions for simulation
   void init();
@@ -93,6 +97,10 @@ public:
   void update(mars::interfaces::sReal time_ms);
   void run();
   void setThreadStopped();
+  void setThreadStarted();
+  void startSimulation();
+  void stopSimulation();
+  void statusUpdate();
 
   // Simulation
   void setInputs();
@@ -112,7 +120,7 @@ public:
   void readConfig();
   void CreateMapping();
   void MapToFMU(std::string VariableName, int IO);
-  void RegisterDataBroker();
+  void RegisterDataBroker(int interval);
 
   // Set the first values
   void SetInitialValues();

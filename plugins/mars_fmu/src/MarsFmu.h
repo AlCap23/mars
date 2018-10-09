@@ -30,7 +30,7 @@
 #define MARS_PLUGINS_MARS_FMU_H
 
 #ifdef _PRINT_HEADER_
-  #warning "MarsFmu.h"
+#warning "MarsFmu.h"
 #endif
 
 // set define if you want to extend the gui
@@ -49,107 +49,68 @@
 
 #include <string>
 
+#include "fmu_master.h"
 #include "fmu_node.h"
 #include "fmilib.h"
 
-namespace mars {
+namespace mars
+{
 
-  namespace plugins {
-    namespace mars_fmu {
+namespace plugins
+{
+namespace mars_fmu
+{
 
-      // inherit from MarsPluginTemplateGUI for extending the gui
-      class MarsFmu: public mars::interfaces::MarsPluginTemplate,
-      mars::data_broker::ReceiverInterface,
-      mars::data_broker::ProducerInterface,
+// inherit from MarsPluginTemplateGUI for extending the gui
+class MarsFmu : public mars::interfaces::MarsPluginTemplate,
+                mars::data_broker::ReceiverInterface,
+                mars::data_broker::ProducerInterface,
 
-        // for gui
-        // public mars::main_gui::MenuInterface,
-        public mars::cfg_manager::CFGClient {
+                // for gui
+                // public mars::main_gui::MenuInterface,
+                public mars::cfg_manager::CFGClient
+{
 
-      public:
-        MarsFmu(lib_manager::LibManager *theManager);
-        ~MarsFmu();
+public:
+  MarsFmu(lib_manager::LibManager *theManager);
+  ~MarsFmu();
 
+  // LibInterface methods
+  int getLibVersion() const
+  {
+    return 1;
+  }
+  const std::string getLibName() const
+  {
+    return std::string("mars_fmu");
+  }
+  CREATE_MODULE_INFO();
 
-        // LibInterface methods
-        int getLibVersion() const
-        { return 1; }
-        const std::string getLibName() const
-        { return std::string("mars_fmu"); }
-        CREATE_MODULE_INFO();
+  // MarsPlugin methods
+  void init();
+  void reset();
+  void update(mars::interfaces::sReal time_ms);
 
-        // MarsPlugin methods
-        void init();
-        void reset();
-        void update(mars::interfaces::sReal time_ms);
+  // DataBrokerReceiver methods
+  virtual void receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam);
+  virtual void produceData(const data_broker::DataInfo &info,
+                           data_broker::DataPackage *package,
+                           int callbackParam);
+  //// CFGClient methods
+  virtual void cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property);
 
-        // DataBrokerReceiver methods
-        virtual void receiveData(const data_broker::DataInfo &info,const data_broker::DataPackage &package, int callbackParam);
-        virtual void produceData(const data_broker::DataInfo &info,
-                                 data_broker::DataPackage *package,
-                                 int callbackParam);
-        //// CFGClient methods
-        virtual void cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property);
+  // MenuInterface methods
+  //void menuAction(int action, bool checked = false);
 
-        // MenuInterface methods
-        //void menuAction(int action, bool checked = false);
+  // MarsFmu methods
 
-        // MarsFmu methods
+private:
+  fmuMaster *Master;
 
+}; // end of class definition MarsFmu
 
-
-
-      private:
-        std::vector<fmuNode*> fmu_models;
-        cfg_manager::cfgPropertyStruct example;
-
-        // Map inputs and outputs from fmu to mars and vice versa
-        std::map<std::string, std::string> mars_fmu_map = { {"joint_torque", "external_torque" } };
-        std::map<std::string, std::string> fmu_mars_map =  { {"output_speed" , "motor_a" } };
-        // Array to store the fmu output IDs
-        std::vector<fmi2_value_reference_t> dataBroker_ID;
-
-        // Make some ID maps
-        std::map<unsigned long, fmi2_value_reference_t> mars_fmu_ID;
-        std::map<fmi2_value_reference_t, unsigned long> fmu_mars_ID;
-
-        // File system
-        std::string typeName;
-        std::string fmu_path; //= "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/Test/PT2.fmu";
-        std::string tmp_path; // = "/media/jmartensen/Data/linux/mars_dev/simulation/mars/plugins/mars_fmu/tmp";
-
-        // Callbacks
-        jm_callbacks callbacks;
-
-        // FMI - Global variables used for managing
-        fmi_import_context_t* context;
-        fmi_version_enu_t version;
-
-        fmi2_import_t* fmu;
-        fmi2_callback_functions_t callBackFunctions;
-
-        // FMI - Global variables used for simulation
-        fmi2_string_t fmu_instanceName; // = "Test Model";
-        fmi2_string_t fmu_GUID;
-        fmi2_real_t fmu_relativeTolerance; // = 1e-2;
-
-        fmi2_status_t fmu_status;
-        jm_status_enu_t fmu_status_jm;
-
-        // Store inputs and outputs
-        fmi2_real_t fmu_output = 0.0;
-        fmi2_real_t *sensorData;
-
-        fmi2_real_t current_time; // = 0.0;
-        fmi2_real_t time_step; // = 1e-3;
-        fmi2_boolean_t stop_time_defined; // = fmi2_false;
-
-
-
-      }; // end of class definition MarsFmu
-
-    } // end of namespace mars_fmu
-  } // end of namespace plugins
+} // end of namespace mars_fmu
+} // end of namespace plugins
 } // end of namespace mars
 
 #endif // MARS_PLUGINS_MARS_FMU_H
