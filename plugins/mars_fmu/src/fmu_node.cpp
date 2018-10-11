@@ -40,8 +40,6 @@ fmuNode::fmuNode(std::string Name, configmaps::ConfigMap fmu_config, mars::inter
   // Init the FMU
   this->init();
 
-  fprintf(stderr, "We are here right now \n");
-
   // Init the threading
   step_finished = true;
   pthread_mutex_init(&fmu_thread_Mutex, NULL);
@@ -252,29 +250,44 @@ void fmuNode::stepSimulation()
 
 void fmuNode::setInputs()
 {
-  pthread_mutex_lock(&fmu_thread_Mutex);
-  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
-  std::vector<mars::interfaces::sReal>::iterator j = current_inputs.begin();
 
-  long package_id = 0.0;
+  pthread_mutex_lock(&fmu_thread_Mutex);
+
+  std::vector<fmi2_value_reference_t>::iterator i = fmu_inputs.begin();
   mars::interfaces::sReal cmd_value = 0.0;
 
-  for (; i != fmu_inputs.end(); i++)
+  if (!current_inputs.empty())
   {
-    // Set the input
-    if (j != current_inputs.end() && !std::isnan(*j))
+
+    std::vector<mars::interfaces::sReal>::iterator j = current_inputs.begin();
+
+    for (; i != fmu_inputs.end() && j != current_inputs.end(); i++, j++)
     {
-      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &(*j));
-      if (fmu_status != fmi2_status_ok)
+      // Set the input
+      if (!std::isnan(*j) && *i)
       {
-        fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
+        fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &(*j));
       }
-      j++;
+      else
+      {
+        fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
+      }
     }
-    else
+  }
+  else
+  {
+    for (; i != fmu_inputs.end(); i++)
     {
-      fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
+      if (*i)
+      {
+        fmu_status = fmi2_import_set_real(fmu, &(*i), 1, &cmd_value);
+      }
     }
+  }
+
+  if (fmu_status != fmi2_status_ok)
+  {
+    fprintf(stderr, "Setting FMU input value of instance %s failed! \n", fmu_instanceName.c_str());
   }
 
   pthread_mutex_unlock(&fmu_thread_Mutex);
@@ -414,6 +427,7 @@ void fmuNode::init()
   this->SetInitialValues();
 
   // Exit initialization mode
+
   fmu_status = fmi2_import_exit_initialization_mode(fmu);
   if (fmu_status != fmi2_status_ok)
   {
@@ -594,11 +608,8 @@ void fmuNode::SetInitialValues()
         }
       }
     }
+    fprintf(stderr, "Finished setting initial values. \n");
   }
-
-  this->setInputs();
-  this->getOutputs();
-  this->getObserved();
 }
 
 // DATA BROKER FUNCTIONS
