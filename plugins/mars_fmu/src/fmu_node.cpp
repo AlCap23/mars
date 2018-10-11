@@ -221,7 +221,6 @@ void fmuNode::statusUpdate()
 void fmuNode::stepSimulation()
 {
 
-  target_time = local_time + time_step;
   fprintf(stderr, "Stepping \n");
 
   // Set the inputs
@@ -244,6 +243,8 @@ void fmuNode::stepSimulation()
   // Set simulation status
   step_finished = true;
   do_step = false;
+
+  target_time = local_time + time_step;
 }
 
 // INPUT & OUTPUT SETTERS AND GETTERS
@@ -444,6 +445,7 @@ void fmuNode::init()
   // Set the status
   do_step = false;
   step_finished = true;
+  target_time = local_time + time_step;
 
   // Set the simulation stopped
   this->stopSimulation();
@@ -619,16 +621,28 @@ void fmuNode::RegisterDataBroker(int interval)
   communication_interval = interval;
   fprintf(stderr, "%s  : interval is %d \n", fmu_instanceName.c_str(), interval);
 
-  producerID = control->dataBroker->pushData(producerGroup, producerData, producerPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_FLAG);
+  // Publish results
+  producerID = control->dataBroker->pushData(producerGroup, producerData,
+                                             producerPackage, NULL,
+                                             mars::data_broker::DATA_PACKAGE_READ_FLAG);
 
   control->dataBroker->registerTimedProducer(this, producerGroup, producerData,
                                              "mars_fmu/simTimer",
                                              interval);
 
-  receiverID = control->dataBroker->pushData(receiverGroup, receiverData, receiverPackage, NULL, mars::data_broker::DATA_PACKAGE_READ_WRITE_FLAG);
+  receiverID = control->dataBroker->pushData(receiverGroup, receiverData,
+                                             receiverPackage, NULL,
+                                             mars::data_broker::DATA_PACKAGE_READ_WRITE_FLAG);
 
-  // TODO mars_fmu/simTimer
-  control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData, "mars_fmu/simTimer", interval);
+  // Get inputs
+  control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData,
+                                             "mars_fmu/simTimer",
+                                             interval, 0);
+
+  // Control stepping
+  control->dataBroker->registerTimedReceiver(this, "mars_fmu", "simTimer",
+                                             "mars_fmu/simTimer", interval,
+                                             1);
 }
 
 void fmuNode::produceData(const mars::data_broker::DataInfo &info,
@@ -642,12 +656,14 @@ void fmuNode::produceData(const mars::data_broker::DataInfo &info,
   std::vector<fmi2_real_t>::iterator j = current_observed.begin();
   std::vector<std::string>::iterator k = fmu_observed_names.begin();
 
+  // Observed variables
   for (; j != current_observed.end() && k != fmu_observed_names.end(); j++, k++)
   {
     package_id = package->getIndexByName(*k);
     package->set(package_id, *j);
   }
 
+  // Output variables
   j = current_outputs.begin();
   k = fmu_output_names.begin();
 
@@ -663,28 +679,35 @@ void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
                           const mars::data_broker::DataPackage &package,
                           int callbackParam)
 {
-  pthread_mutex_lock(&fmu_thread_Mutex);
-  // Reset the iterator
-  std::vector<std::string>::iterator i = fmu_input_names.begin();
-  current_inputs.clear();
+  fprintf(stderr, "Callback %d \n", callbackParam);
 
-  long package_id = 0.0;
-  mars::interfaces::sReal cmd_value = 0.0;
-
-  for (; i != fmu_input_names.end(); i++)
+  if (callbackParam == 0)
   {
-    package_id = package.getIndexByName(*i);
-    package.get(package_id, &cmd_value);
+    pthread_mutex_lock(&fmu_thread_Mutex);
+    std::vector<std::string>::iterator i = fmu_input_names.begin();
+    current_inputs.clear();
 
-    if (package_id > -1)
+    long package_id = 0.0;
+    mars::interfaces::sReal cmd_value = 0.0;
+
+    for (; i != fmu_input_names.end(); i++)
     {
-      current_inputs.push_back(cmd_value);
+      package_id = package.getIndexByName(*i);
+      package.get(package_id, &cmd_value);
+
+      if (package_id > -1)
+      {
+        current_inputs.push_back(cmd_value);
+      }
+      else
+      {
+        current_inputs.push_back(NAN);
+      }
     }
-    else
-    {
-      current_inputs.push_back(NAN);
-    }
+    pthread_mutex_unlock(&fmu_thread_Mutex);
   }
-  pthread_mutex_unlock(&fmu_thread_Mutex);
-  this->startSimulation();
+  else
+  {
+    this->startSimulation();
+  }
 }

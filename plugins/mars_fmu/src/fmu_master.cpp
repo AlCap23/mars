@@ -44,17 +44,23 @@ fmuMaster::fmuMaster(ControlCenter *controlCenter)
                 // Create a new fmu and store it
                 fmu_models.push_back(new fmuNode(fmus.first, current_fmu, control));
                 // Get status and store it
-                //fmu_status.push_back((fmu_models.back())->getStatus());
+                fmu_status.push_back((fmu_models.back())->getStatus());
                 // Get the target time and store it
-                //fmu_targetTime.push_back((fmu_models.back())->getTargetTime());
+                fmu_targetTime.push_back((fmu_models.back())->getTargetTime());
             }
         }
 
-        //this->setStepSize();
-        //this->setUpdateInterval();
+        this->setStepSize();
+        this->setUpdateInterval();
 
         // Set the time
         current_time = 0.0;
+
+        this->registerDataBroker();
+
+        // Start mars thread
+        thread_running = true;
+        start();
     }
     else
     {
@@ -65,10 +71,20 @@ fmuMaster::fmuMaster(ControlCenter *controlCenter)
 
 fmuMaster::~fmuMaster()
 {
+    thread_running = false;
+
+    while (isRunning())
+    {
+        msleep(1);
+    }
+
     for (auto fmus : fmu_models)
     {
         fmus->~fmuNode();
     }
+
+    control->dataBroker->unregisterTimedReceiver(this, "*", "*",
+                                                 "mars_fmu/simTimer");
 }
 
 void fmuMaster::reset()
@@ -83,18 +99,8 @@ void fmuMaster::reset()
 
 void fmuMaster::update(mars::interfaces::sReal update_time)
 {
-    // Start iterators
-    std::vector<fmuNode *>::iterator i = fmu_models.begin();
-    std::vector<int *>::iterator j = fmu_status.begin();
-    std::vector<fmi2_real_t *>::iterator k = fmu_targetTime.begin();
-    bool fmu_status_ = false;
-    fmi2_real_t fmu_targetTime_ = NAN;
 
-    // Iterate over the fmus
-    //for (; i != fmu_models.end() && j != fmu_status.end() && k != fmu_targetTime.end(); i++, j++, k++)
-    //{
-    //    fmu_status_ = checkStatus(*j);
-    //}
+    fprintf(stderr, "Update! \n");
 }
 
 void fmuMaster::setStepSize()
@@ -129,6 +135,7 @@ void fmuMaster::setUpdateInterval()
 {
     for (auto fmu : fmu_models)
     {
+        fprintf(stderr, "Register fmu at data broker \n");
         double interval = fmu->getStepSize() / step_size;
         fmu->RegisterDataBroker((int)interval);
     }
@@ -136,11 +143,17 @@ void fmuMaster::setUpdateInterval()
 
 bool fmuMaster::checkStatus(int *status)
 {
+    fprintf(stderr, "Current status : %d \n", *status);
     // Check the status
     if (*status == -1)
     {
         fprintf(stderr, "   FMU error \n");
         return false;
+    }
+    else if (*status == 0)
+    {
+        fprintf(stderr, "   FMU idle \n");
+        return true;
     }
     else if (*status == 1)
     {
@@ -158,3 +171,91 @@ bool fmuMaster::checkStatus(int *status)
         return true;
     }
 }
+
+bool fmuMaster::getWait()
+{
+    return mars_wait;
+}
+
+void fmuMaster::run()
+{
+    current_time = 0.0;
+    current_mars_time = 0.0;
+    mars_wait = false;
+    while (thread_running)
+    {
+
+        // Iterator
+        std::vector<fmi2_real_t *>::iterator i = fmu_targetTime.begin();
+
+        // Set the next target to inf
+        next_target = INFINITY;
+
+        // Find the minimal next value
+        for (; i != fmu_targetTime.end(); i++)
+        {
+            if (*(*i) <= next_target)
+            {
+                next_target = *(*i);
+            }
+        }
+
+        // Step the timer if next target is in future
+        if (current_time + step_size <= next_target || mars_wait)
+        {
+            //fprintf(stderr, "Next target : %g \n", next_target);
+            double steps = (next_target - current_time) / step_size;
+            if (steps <= 0)
+            {
+                steps = 1;
+            }
+
+            control->dataBroker->stepTimer("mars_fmu/simTimer", (int)steps);
+            current_time = next_target;
+            producerPackage.set(0, current_time);
+            producerID = control->dataBroker->pushData(producerGroup, producerData,
+                                                       producerPackage, NULL,
+                                                       mars::data_broker::DATA_PACKAGE_READ_FLAG);
+        }
+        else
+        {
+            //fprintf(stderr, "Sleep \n");
+            msleep(1);
+        }
+        mars_wait = current_mars_time > current_time;
+    }
+}
+
+void fmuMaster::registerDataBroker()
+{
+    producerGroup = "mars_fmu";
+    producerData = "simTimer";
+    producerPackage.add("simTime", current_time);
+
+    receiverGroup = "mars_sim";
+    receiverData = "simTime";
+
+    control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData,
+                                               "mars_fmu/simTimer",
+                                               0);
+    control->dataBroker->registerTimedReceiver(this, receiverGroup, receiverData,
+                                               "mars_sim/simTimer",
+                                               1);
+}
+
+void fmuMaster::produceData(const mars::data_broker::DataInfo &info,
+                            mars::data_broker::DataPackage *package,
+                            int callbackParam)
+{
+    package->set(0, current_time);
+};
+
+void fmuMaster::receiveData(const mars::data_broker::DataInfo &info,
+                            const mars::data_broker::DataPackage &package,
+                            int callbackParam)
+{
+    package.get(0, &current_mars_time);
+    // Set to seconds
+    current_mars_time *= 1e-3;
+    fprintf(stderr, "Mars Time %g , FMU Time %g \n", current_mars_time, current_time);
+};

@@ -35,6 +35,7 @@
 
 // set define if you want to extend the gui
 //#define PLUGIN_WITH_MARS_GUI
+#include <mars/utils/misc.h>
 #include <mars/interfaces/sim/MarsPluginTemplate.h>
 #include <mars/interfaces/MARSDefs.h>
 
