@@ -40,6 +40,8 @@ fmuNode::fmuNode(std::string Name, configmaps::ConfigMap fmu_config, mars::inter
   // Init the FMU
   this->init();
 
+  fprintf(stderr, "We are here right now \n");
+
   // Init the threading
   step_finished = true;
   pthread_mutex_init(&fmu_thread_Mutex, NULL);
@@ -210,6 +212,10 @@ void fmuNode::statusUpdate()
     {
 
       simulation_status = 2;
+    }
+    else
+    {
+      simulation_status = 0;
     }
   }
 }
