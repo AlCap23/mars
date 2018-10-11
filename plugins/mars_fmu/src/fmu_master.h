@@ -71,8 +71,6 @@ private:
   fmi2_real_t next_target;
   // Storage for all fmu models
   std::vector<fmuNode *> fmu_models;
-  // Storage for the status of fmu
-  std::vector<int *> fmu_status;
   // Storage for the target times
   std::vector<fmi2_real_t *> fmu_targetTime;
 };

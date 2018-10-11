@@ -66,18 +66,6 @@ void MarsFmu::update(sReal time_ms)
   {
     msleep(1);
   }
-  fprintf(stderr, "Finished step! \n");
-}
-
-void MarsFmu::produceData(const data_broker::DataInfo &info,
-                          data_broker::DataPackage *package,
-                          int callbackParam)
-{
-}
-
-void MarsFmu::receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam)
-{
-  // package.get("force1/x", force);
 }
 
 void MarsFmu::cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property)

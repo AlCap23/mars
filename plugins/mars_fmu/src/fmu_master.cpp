@@ -43,8 +43,6 @@ fmuMaster::fmuMaster(ControlCenter *controlCenter)
                 configmaps::ConfigMap current_fmu = marsfmu_Config[fmus.first];
                 // Create a new fmu and store it
                 fmu_models.push_back(new fmuNode(fmus.first, current_fmu, control));
-                // Get status and store it
-                fmu_status.push_back((fmu_models.back())->getStatus());
                 // Get the target time and store it
                 fmu_targetTime.push_back((fmu_models.back())->getTargetTime());
             }
@@ -52,9 +50,6 @@ fmuMaster::fmuMaster(ControlCenter *controlCenter)
 
         this->setStepSize();
         this->setUpdateInterval();
-
-        // Set the time
-        current_time = 0.0;
 
         this->registerDataBroker();
 
@@ -95,14 +90,6 @@ void fmuMaster::reset()
     }
 }
 
-// TODO dies das
-
-void fmuMaster::update(mars::interfaces::sReal update_time)
-{
-
-    fprintf(stderr, "Update! \n");
-}
-
 void fmuMaster::setStepSize()
 {
     // Get the step time
@@ -138,37 +125,6 @@ void fmuMaster::setUpdateInterval()
         fprintf(stderr, "Register fmu at data broker \n");
         double interval = fmu->getStepSize() / step_size;
         fmu->RegisterDataBroker((int)interval);
-    }
-}
-
-bool fmuMaster::checkStatus(int *status)
-{
-    fprintf(stderr, "Current status : %d \n", *status);
-    // Check the status
-    if (*status == -1)
-    {
-        fprintf(stderr, "   FMU error \n");
-        return false;
-    }
-    else if (*status == 0)
-    {
-        fprintf(stderr, "   FMU idle \n");
-        return true;
-    }
-    else if (*status == 1)
-    {
-        fprintf(stderr, "   FMU stepping \n");
-        return true;
-    }
-    else if (*status == 2)
-    {
-        fprintf(stderr, "   FMU finished\n");
-        return true;
-    }
-    else
-    {
-        fprintf(stderr, "   Unknown state");
-        return true;
     }
 }
 
@@ -257,5 +213,4 @@ void fmuMaster::receiveData(const mars::data_broker::DataInfo &info,
     package.get(0, &current_mars_time);
     // Set to seconds
     current_mars_time *= 1e-3;
-    fprintf(stderr, "Mars Time %g , FMU Time %g \n", current_mars_time, current_time);
 };

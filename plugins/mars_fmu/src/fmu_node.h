@@ -36,7 +36,7 @@ class fmuNode : public mars::data_broker::ProducerInterface,
   // Threading
   pthread_t fmu_thread;
   pthread_mutex_t fmu_thread_Mutex;
-  int simulation_status, communication_interval;
+  int communication_interval;
   bool thread_running, do_step, step_finished;
 
   // Filesystem for the fmu

@@ -127,11 +127,6 @@ void fmuNode::reset()
 
 // STATUS GETTER
 
-int *fmuNode::getStatus()
-{
-  return &simulation_status;
-}
-
 fmi2_real_t *fmuNode::getTargetTime()
 {
   return &target_time;
@@ -151,8 +146,6 @@ void fmuNode::run()
 
   while (thread_running)
   {
-    this->statusUpdate();
-
     if (do_step)
     {
       this->stepSimulation();
@@ -176,52 +169,17 @@ void fmuNode::setThreadStopped()
 
 void fmuNode::startSimulation()
 {
-  fprintf(stderr, "Starting FMU \n");
   step_finished = false;
   do_step = true;
 }
 
 void fmuNode::stopSimulation()
 {
-
-  fprintf(stderr, "Stopping FMU \n");
   do_step = false;
-}
-
-void fmuNode::statusUpdate()
-{
-  //fprintf(stderr, "Updating Status \n");
-  // Set the simulation status
-
-  // Thread running
-  if (fmu_status != fmi2_status_ok)
-  {
-    // Error
-    simulation_status = -1;
-  }
-  else
-  {
-    // Do a step
-    if (do_step)
-    {
-      simulation_status = 1;
-    }
-    else if (step_finished)
-    {
-
-      simulation_status = 2;
-    }
-    else
-    {
-      simulation_status = 0;
-    }
-  }
 }
 
 void fmuNode::stepSimulation()
 {
-
-  fprintf(stderr, "Stepping \n");
 
   // Set the inputs
   this->setInputs();
@@ -449,8 +407,6 @@ void fmuNode::init()
 
   // Set the simulation stopped
   this->stopSimulation();
-  // Set the status
-  this->statusUpdate();
 }
 
 void fmuNode::readConfig()
@@ -679,7 +635,6 @@ void fmuNode::receiveData(const mars::data_broker::DataInfo &info,
                           const mars::data_broker::DataPackage &package,
                           int callbackParam)
 {
-  fprintf(stderr, "Callback %d \n", callbackParam);
 
   if (callbackParam == 0)
   {

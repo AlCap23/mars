@@ -64,8 +64,6 @@ namespace mars_fmu
 
 // inherit from MarsPluginTemplateGUI for extending the gui
 class MarsFmu : public mars::interfaces::MarsPluginTemplate,
-                mars::data_broker::ReceiverInterface,
-                mars::data_broker::ProducerInterface,
 
                 // for gui
                 // public mars::main_gui::MenuInterface,
@@ -93,10 +91,10 @@ public:
   void update(mars::interfaces::sReal time_ms);
 
   // DataBrokerReceiver methods
-  virtual void receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam);
-  virtual void produceData(const data_broker::DataInfo &info,
-                           data_broker::DataPackage *package,
-                           int callbackParam);
+  //virtual void receiveData(const data_broker::DataInfo &info, const data_broker::DataPackage &package, int callbackParam);
+  //virtual void produceData(const data_broker::DataInfo &info,
+  //                         data_broker::DataPackage *package,
+  //                         int callbackParam);
   //// CFGClient methods
   virtual void cfgUpdateProperty(cfg_manager::cfgPropertyStruct _property);
 
