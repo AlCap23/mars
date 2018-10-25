@@ -29,6 +29,7 @@
 #include "MarsFmu.h"
 #include <mars/data_broker/DataBrokerInterface.h>
 #include <mars/data_broker/DataPackage.h>
+#include <base/include/FMUBase.h>
 
 namespace mars
 {
@@ -64,7 +65,8 @@ void MarsFmu::update(sReal time_ms)
 {
   while (Master->getWait())
   {
-    msleep(1);
+    // We wait for 1 microsec
+    ::usleep(1);
   }
 }
 

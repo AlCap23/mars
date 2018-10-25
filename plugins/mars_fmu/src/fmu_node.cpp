@@ -59,7 +59,7 @@ fmuNode::~fmuNode()
 #ifdef WIN32
     Sleep(0.1);
 #else
-    usleep(10);
+    usleep(1);
 #endif
   }
   // Destroy the fmu
@@ -152,7 +152,8 @@ void fmuNode::run()
     }
     else
     {
-      mars::utils::msleep(1);
+      // Using usleep is much more perfomant!
+      ::usleep(1);
     }
   }
 }
